@@ -16,13 +16,7 @@ func NewAvatarRepository(cfg *config.Config, db *pgxpool.Pool) (AvatarRepository
 		fmt.Println("Using In-Memory Avatar Repository (test mode)")
 		return memory.NewAvatarRepository(), nil
 
-	case "development":
-		// Можно переключать через ENV, но по умолчанию in-memory
-		fmt.Println("Using In-Memory Avatar Repository (development mode)")
-		return memory.NewAvatarRepository(), nil
-
 	default:
-		// production, staging — только Postgres
 		if db == nil {
 			return nil, fmt.Errorf("postgres connection pool is required in %s environment", cfg.Server.Env)
 		}

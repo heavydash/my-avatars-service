@@ -3,16 +3,14 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/heavydash/my-avatars-service/internal/api"
 	"github.com/heavydash/my-avatars-service/internal/api/handler"
-	"github.com/heavydash/my-avatars-service/internal/api/middleware"
-	_ "github.com/heavydash/my-avatars-service/internal/api/middleware"
 	"github.com/heavydash/my-avatars-service/internal/config"
 	"github.com/heavydash/my-avatars-service/internal/pkg/logger"
 	"github.com/heavydash/my-avatars-service/internal/repository"
 	"github.com/heavydash/my-avatars-service/internal/repository/postgres"
 	"github.com/heavydash/my-avatars-service/internal/service"
 	minio2 "github.com/heavydash/my-avatars-service/internal/storage/minio"
-	"github.com/labstack/echo/v4"
 	"go.uber.org/zap"
 	"net/http"
 	"os"
@@ -84,34 +82,19 @@ func main() {
 
 	log.Info("All layers initialized successfully")
 
-	// Echo
-	e := echo.New()
+	// Настройка роутера Gin
+	r := api.NewRouter(avatarHandler, log)
 
-	// Middleware
-	middleware.Setup(e)
+	// HTTP сервер
+	srv := &http.Server{
+		Addr:    cfg.Server.Addr(),
+		Handler: r,
+	}
 
-	// Routes
-	e.GET("/health", func(c echo.Context) error {
-		return c.JSON(http.StatusOK, map[string]string{
-			"status":  "ok",
-			"service": "gophprofile",
-			"env":     cfg.Server.Env,
-		})
-	})
-
-	e.GET("/", func(c echo.Context) error {
-		return c.String(http.StatusOK, "GophProfile Avatar Service is running\n")
-	})
-
-	// API v1
-	api := e.Group("/api/v1")
-	api.POST("/avatars", avatarHandler.UploadAvatar)
-
+	// Запуск сервера в горутине
 	go func() {
-		addr := cfg.Server.Addr()
-		log.Info("HTTP server starting", zap.String("address", addr))
-
-		if err := e.Start(addr); err != nil && err != http.ErrServerClosed {
+		log.Info("HTTP server starting", zap.String("address", srv.Addr))
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatal("Server failed", zap.Error(err))
 		}
 	}()
@@ -125,7 +108,7 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), cfg.Server.ShutdownTimeout)
 	defer cancel()
 
-	if err := e.Shutdown(ctx); err != nil {
+	if err := srv.Shutdown(ctx); err != nil {
 		log.Error("Server forced to shutdown", zap.Error(err))
 	}
 

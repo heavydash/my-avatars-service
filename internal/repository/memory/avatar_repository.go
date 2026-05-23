@@ -28,13 +28,13 @@ func (r *AvatarRepository) Create(ctx context.Context, avatar *domain.Avatar) er
 func (r *AvatarRepository) GetByID(ctx context.Context, id uuid.UUID) (*domain.Avatar, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
+
 	avatar, ok := r.avatars[id]
 	if !ok {
 		return nil, domain.ErrNotFound
 	}
 	return avatar, nil
 }
-
 func (r *AvatarRepository) GetByUserID(ctx context.Context, userID uuid.UUID) ([]*domain.Avatar, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()

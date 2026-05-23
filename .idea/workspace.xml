@@ -5,30 +5,17 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="ccdcb1bf-b368-4dad-836c-6bfd7ac9b25b" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/.idea/gophprofile.iml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/modules.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/sqldialects.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/vcs.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/cmd/server/main.go" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/docker-compose.yml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/go.mod" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/go.sum" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/internal/api/handler/avatar_handlers.go" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/internal/api/middleware/middleware.go" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/internal/config/config.go" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/internal/domain/avatar.go" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/internal/domain/errors.go" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/internal/pkg/logger/logger.go" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/internal/repository/factory.go" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/internal/repository/memory/avatar_repository.go" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/internal/repository/postgres/avatar_repository.go" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/internal/repository/postgres/pool.go" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/internal/repository/repository.go" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/internal/service/avatar_service.go" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/internal/storage/minio/minio.go" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/internal/storage/storage.go" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/migrations/20260522143239_create_avatars_table.sql" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cmd/server/main.go" beforeDir="false" afterPath="$PROJECT_DIR$/cmd/server/main.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/go.mod" beforeDir="false" afterPath="$PROJECT_DIR$/go.mod" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/go.sum" beforeDir="false" afterPath="$PROJECT_DIR$/go.sum" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/internal/api/handler/avatar_handlers.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/api/handler/avatar_handlers.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/internal/api/middleware/middleware.go" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/internal/domain/errors.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/domain/errors.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/internal/repository/factory.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/repository/factory.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/internal/repository/memory/avatar_repository.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/repository/memory/avatar_repository.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/internal/repository/postgres/avatar_repository.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/repository/postgres/avatar_repository.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/internal/service/avatar_service.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/service/avatar_service.go" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />

@@ -26,15 +26,27 @@ func NewAvatarService(repo repository.AvatarRepository, storage storage.Storage)
 
 // UploadAvatar обрабатывает загрузку аватарки
 func (s *AvatarService) UploadAvatar(ctx context.Context, userID uuid.UUID, file multipart.File, header *multipart.FileHeader) (*domain.Avatar, error) {
+	// Валидация user_id
+	if userID == uuid.Nil {
+		return nil, domain.ErrInvalidInput
+	}
 	// Валидация размера
 	if header.Size > 10*1024*1024 { // 10MB
-		return nil, fmt.Errorf("file size exceeds 10MB limit")
+		return nil, domain.ErrFileTooLarge
 	}
 
-	// Валидация типа файла
+	// Разрешённые типы файлов
 	contentType := header.Header.Get("Content-Type")
-	if contentType != "image/jpeg" && contentType != "image/png" && contentType != "image/webp" {
-		return nil, fmt.Errorf("unsupported file type: %s", contentType)
+	allowedTypes := map[string]bool{
+		"image/jpeg":      true,
+		"image/png":       true,
+		"image/webp":      true,
+		"image/gif":       true,
+		"application/pdf": true,
+	}
+
+	if !allowedTypes[contentType] {
+		return nil, domain.ErrUnsupportedFormat
 	}
 
 	// Создаём доменную сущность
@@ -45,7 +57,7 @@ func (s *AvatarService) UploadAvatar(ctx context.Context, userID uuid.UUID, file
 	if err != nil {
 		avatar.MarkAsFailed(err.Error())
 		_ = s.repo.Create(ctx, avatar)
-		return nil, fmt.Errorf("failed to save file: %w", err)
+		return nil, fmt.Errorf("%w: %w", domain.ErrUploadFailed, err)
 	}
 
 	avatar.OriginalURL = url
@@ -53,8 +65,34 @@ func (s *AvatarService) UploadAvatar(ctx context.Context, userID uuid.UUID, file
 
 	// Сохраняем метаданные в БД
 	if err := s.repo.Create(ctx, avatar); err != nil {
-		return nil, fmt.Errorf("failed to save avatar metadata: %w", err)
+		return nil, domain.ErrInternal
 	}
 
 	return avatar, nil
+}
+
+// DeleteAvatar — удаление аватарки
+func (s *AvatarService) DeleteAvatar(ctx context.Context, id uuid.UUID) error {
+	avatar, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		return err
+	}
+
+	// Удаляем файл из MinIO
+	if err := s.storage.Delete(ctx, avatar.ID.String()); err != nil {
+		fmt.Printf("Warning: failed to delete file from storage: %v\n", err)
+	}
+
+	// Удаляем метаданные из БД
+	return s.repo.Delete(ctx, id)
+}
+
+// GetByID — получение аватарки по ID
+func (s *AvatarService) GetByID(ctx context.Context, id uuid.UUID) (*domain.Avatar, error) {
+	return s.repo.GetByID(ctx, id)
+}
+
+// GetByUserID — получение всех аватарок пользователя
+func (s *AvatarService) GetByUserID(ctx context.Context, userID uuid.UUID) ([]*domain.Avatar, error) {
+	return s.repo.GetByUserID(ctx, userID)
 }

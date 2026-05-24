@@ -98,11 +98,33 @@ func (r *AvatarRepository) GetByUserID(ctx context.Context, userID uuid.UUID) ([
 }
 
 func (r *AvatarRepository) Update(ctx context.Context, avatar *domain.Avatar) error {
-	// будет реализовано позже
-	return nil
+	query := `
+		UPDATE avatars 
+		SET original_url = $2, status = $3, error = $4, updated_at = $5
+		WHERE id = $1`
+
+	_, err := r.db.Exec(ctx, query,
+		avatar.ID,
+		avatar.OriginalURL,
+		avatar.Status,
+		avatar.Error,
+		avatar.UpdatedAt,
+	)
+	return err
 }
 
 func (r *AvatarRepository) Delete(ctx context.Context, id uuid.UUID) error {
-	// будет реализовано позже
+	query := `DELETE FROM avatars WHERE id = $1`
+
+	result, err := r.db.Exec(ctx, query, id)
+	if err != nil {
+		return err
+	}
+
+	rowsAffected := result.RowsAffected()
+	if rowsAffected == 0 {
+		return domain.ErrNotFound
+	}
+
 	return nil
 }

@@ -6,6 +6,7 @@ import (
 	"github.com/heavydash/my-avatars-service/internal/api"
 	"github.com/heavydash/my-avatars-service/internal/api/handler"
 	"github.com/heavydash/my-avatars-service/internal/config"
+	"github.com/heavydash/my-avatars-service/internal/events"
 	"github.com/heavydash/my-avatars-service/internal/pkg/logger"
 	"github.com/heavydash/my-avatars-service/internal/repository"
 	"github.com/heavydash/my-avatars-service/internal/repository/postgres"
@@ -74,8 +75,24 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Инициализация RabbitMQ
+	rabbitURL := "amqp://guest:guest@localhost:5672/"
+	rabbitMQ, err := events.NewRabbitMQ(rabbitURL)
+	if err != nil {
+		log.Error("Failed to connect to RabbitMQ", zap.Error(err))
+	} else {
+		log.Info("Successfully connected to RabbitMQ")
+		defer rabbitMQ.Close()
+	}
+
+	// Publisher
+	var publisher *events.Publisher
+	if rabbitMQ != nil {
+		publisher = events.NewPublisher(rabbitMQ.Channel())
+	}
+
 	// Сервис
-	avatarService := service.NewAvatarService(avatarRepo, fileStorage)
+	avatarService := service.NewAvatarService(avatarRepo, fileStorage, publisher, log)
 
 	// Handler
 	avatarHandler := handler.NewAvatarHandler(avatarService)

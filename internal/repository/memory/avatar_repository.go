@@ -58,6 +58,11 @@ func (r *AvatarRepository) Update(ctx context.Context, avatar *domain.Avatar) er
 func (r *AvatarRepository) Delete(ctx context.Context, id uuid.UUID) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+
+	if _, exists := r.avatars[id]; !exists {
+		return domain.ErrNotFound
+	}
+
 	delete(r.avatars, id)
 	return nil
 }

@@ -5,22 +5,29 @@ import (
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/heavydash/my-avatars-service/internal/domain"
+	"github.com/heavydash/my-avatars-service/internal/events"
+	"github.com/heavydash/my-avatars-service/internal/pkg/logger"
 	"github.com/heavydash/my-avatars-service/internal/repository"
 	"github.com/heavydash/my-avatars-service/internal/storage"
+	"go.uber.org/zap"
 	"mime/multipart"
 )
 
 // AvatarService — бизнес-логика работы с аватарками
 type AvatarService struct {
-	repo    repository.AvatarRepository
-	storage storage.Storage
+	repo      repository.AvatarRepository
+	storage   storage.Storage
+	publisher *events.Publisher
+	logger    logger.Logger
 }
 
 // NewAvatarService сервис добавления аватарок
-func NewAvatarService(repo repository.AvatarRepository, storage storage.Storage) *AvatarService {
+func NewAvatarService(repo repository.AvatarRepository, storage storage.Storage, publisher *events.Publisher, log logger.Logger) *AvatarService {
 	return &AvatarService{
-		repo:    repo,
-		storage: storage,
+		repo:      repo,
+		storage:   storage,
+		publisher: publisher,
+		logger:    log,
 	}
 }
 
@@ -68,6 +75,28 @@ func (s *AvatarService) UploadAvatar(ctx context.Context, userID uuid.UUID, file
 		return nil, domain.ErrInternal
 	}
 
+	// Публикуем событие для асинхронной обработки
+	if s.publisher != nil {
+		event := domain.AvatarUploadedEvent{
+			AvatarID:    avatar.ID.String(),
+			UserID:      avatar.UserID.String(),
+			OriginalURL: avatar.OriginalURL,
+			FileSize:    avatar.FileSize,
+			ContentType: avatar.ContentType,
+		}
+
+		if err := s.publisher.PublishAvatarUploaded(ctx, event); err != nil {
+			// Пока только warning, не падаем — загрузка уже прошла успешно
+			s.logger.Warn("failed to publish upload event: %v\n",
+				zap.String("avatar_id", avatar.ID.String()),
+				zap.Error(err))
+		} else {
+			s.logger.Info("Event published successfully",
+				zap.String("avatar_id", avatar.ID.String()),
+				zap.String("user_id", avatar.UserID.String()))
+		}
+	}
+
 	return avatar, nil
 }
 
@@ -80,7 +109,9 @@ func (s *AvatarService) DeleteAvatar(ctx context.Context, id uuid.UUID) error {
 
 	// Удаляем файл из MinIO
 	if err := s.storage.Delete(ctx, avatar.ID.String()); err != nil {
-		fmt.Printf("Warning: failed to delete file from storage: %v\n", err)
+		s.logger.Warn("Failed to delete file from storage",
+			zap.String("avatar_id", avatar.ID.String()),
+			zap.Error(err))
 	}
 
 	// Удаляем метаданные из БД
@@ -95,4 +126,9 @@ func (s *AvatarService) GetByID(ctx context.Context, id uuid.UUID) (*domain.Avat
 // GetByUserID — получение всех аватарок пользователя
 func (s *AvatarService) GetByUserID(ctx context.Context, userID uuid.UUID) ([]*domain.Avatar, error) {
 	return s.repo.GetByUserID(ctx, userID)
+}
+
+// GetByIDWithOptions — получение аватарки с параметрами размера и формата
+func (s *AvatarService) GetByIDWithOptions(ctx context.Context, id uuid.UUID, size, format string) (*domain.Avatar, error) {
+	return s.repo.GetByID(ctx, id)
 }

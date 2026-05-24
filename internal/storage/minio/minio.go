@@ -1,12 +1,14 @@
 package minio
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"github.com/heavydash/my-avatars-service/internal/config"
 	"github.com/heavydash/my-avatars-service/internal/storage"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
+	"io"
 	"mime/multipart"
 )
 
@@ -48,6 +50,25 @@ func (s *MinIOStorage) Save(ctx context.Context, objectName string, file multipa
 		return "", err
 	}
 
+	return s.GetURL(objectName), nil
+}
+
+// GetObject скачивает объект из MinIO
+func (s *MinIOStorage) GetObject(ctx context.Context, objectName string) (io.ReadCloser, error) {
+	obj, err := s.client.GetObject(ctx, s.bucket, objectName, minio.GetObjectOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get object from minio: %w", err)
+	}
+	return obj, nil
+}
+
+// SaveFromBytes сохраняет байты напрямую
+func (s *MinIOStorage) SaveFromBytes(ctx context.Context, objectName string, data []byte, contentType string) (string, error) {
+	_, err := s.client.PutObject(ctx, s.bucket, objectName, bytes.NewReader(data), int64(len(data)),
+		minio.PutObjectOptions{ContentType: contentType})
+	if err != nil {
+		return "", fmt.Errorf("failed to save bytes to minio: %w", err)
+	}
 	return s.GetURL(objectName), nil
 }
 

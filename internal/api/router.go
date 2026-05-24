@@ -24,6 +24,12 @@ func NewRouter(avatarHandler *handler.AvatarHandler, log logger.Logger) *gin.Eng
 		})
 	})
 
+	r.GET("/web/upload", func(c *gin.Context) {
+		c.File("web/static/index.html")
+	})
+
+	r.Static("/web/static", "./web/static")
+
 	r.GET("/", func(c *gin.Context) {
 		c.String(200, "GophProfile Avatar Service is running\n")
 	})
@@ -35,9 +41,12 @@ func NewRouter(avatarHandler *handler.AvatarHandler, log logger.Logger) *gin.Eng
 		{
 			avatars.POST("", avatarHandler.UploadAvatar)
 			avatars.GET("/:id", avatarHandler.GetAvatar)
+			avatars.GET("/:id/metadata", avatarHandler.GetAvatarMetadata)
 			avatars.GET("", avatarHandler.GetUserAvatars)
 			avatars.DELETE("/:id", avatarHandler.DeleteAvatar)
 		}
+		v1.GET("/users/:user_id/avatar", avatarHandler.GetUserAvatar)
+
 	}
 
 	return r

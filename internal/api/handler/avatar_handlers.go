@@ -75,9 +75,13 @@ func (h *AvatarHandler) GetAvatar(c *gin.Context) {
 		return
 	}
 
-	// TODO: здесь будет логика выбора thumbnail по size/format
+	// Логика выбора URL
+	url := avatar.OriginalURL
+	if size != "original" {
+		url = fmt.Sprintf("http://localhost:9000/avatars/thumbnails/%s/%s.jpg", avatar.ID, size)
+	}
 
-	c.JSON(http.StatusOK, avatar)
+	c.Redirect(http.StatusTemporaryRedirect, url)
 }
 
 // GetUserAvatars — получение аватарок пользователя
@@ -125,8 +129,7 @@ func (h *AvatarHandler) GetUserAvatar(c *gin.Context) {
 	}
 
 	if len(avatars) == 0 {
-		// Заглушка — можно позже заменить на реальный default avatar
-		c.Redirect(http.StatusTemporaryRedirect, "/web/default-avatar.png")
+		c.Redirect(http.StatusTemporaryRedirect, "/web/default-avatar.jpg")
 		return
 	}
 
@@ -141,6 +144,35 @@ func (h *AvatarHandler) DeleteAvatar(c *gin.Context) {
 	id, err := uuid.Parse(idStr)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid avatar id"})
+		return
+	}
+
+	userIDStr := c.GetHeader("X-User-ID")
+	if userIDStr == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "X-User-ID header is required"})
+		return
+	}
+
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid X-User-ID"})
+		return
+	}
+
+	// Получаем аватарку, чтобы проверить владельца
+	avatar, err := h.service.GetByID(c.Request.Context(), id)
+	if err != nil {
+		if err == domain.ErrNotFound {
+			c.JSON(http.StatusNotFound, gin.H{"error": "avatar not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": domain.ErrInternal.Error()})
+		return
+	}
+
+	// Проверка владения
+	if avatar.UserID != userID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "you can only delete your own avatars"})
 		return
 	}
 

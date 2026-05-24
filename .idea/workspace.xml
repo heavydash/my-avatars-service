@@ -5,18 +5,16 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="ccdcb1bf-b368-4dad-836c-6bfd7ac9b25b" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/.idea/sqldialects.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/sqldialects.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmd/server/main.go" beforeDir="false" afterPath="$PROJECT_DIR$/cmd/server/main.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/docker-compose.yml" beforeDir="false" afterPath="$PROJECT_DIR$/docker-compose.yml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/go.mod" beforeDir="false" afterPath="$PROJECT_DIR$/go.mod" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/go.sum" beforeDir="false" afterPath="$PROJECT_DIR$/go.sum" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/internal/api/handler/avatar_handlers.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/api/handler/avatar_handlers.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/internal/api/router.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/api/router.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/internal/repository/memory/avatar_repository.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/repository/memory/avatar_repository.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/internal/domain/events.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/domain/events.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/internal/events/publisher.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/events/publisher.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/internal/repository/postgres/avatar_repository.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/repository/postgres/avatar_repository.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/internal/service/avatar_service.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/service/avatar_service.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/internal/storage/minio/minio.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/storage/minio/minio.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/internal/storage/storage.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/storage/storage.go" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -52,7 +50,7 @@
     "RunOnceActivity.go.migrated.go.modules.settings": "true",
     "RunOnceActivity.go.modules.automatic.dependencies.download": "true",
     "RunOnceActivity.go.modules.go.list.on.any.changes.was.set": "true",
-    "git-widget-placeholder": "iter2",
+    "git-widget-placeholder": "iter4",
     "go.import.settings.migrated": "true",
     "go.sdk.automatically.set": "true",
     "last_opened_file_path": "/Users/anton/GolandProjects/gophprofile",

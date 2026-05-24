@@ -32,3 +32,22 @@ func (p *Publisher) PublishAvatarUploaded(ctx context.Context, event domain.Avat
 		},
 	)
 }
+
+// PublishAvatarDeleted — публикует событие удаления
+func (p *Publisher) PublishAvatarDeleted(ctx context.Context, event domain.AvatarDeleteEvent) error {
+	body, err := json.Marshal(event)
+	if err != nil {
+		return err
+	}
+
+	return p.ch.PublishWithContext(ctx,
+		"avatars.exchange",
+		"avatar.deleted",
+		false,
+		false,
+		amqp091.Publishing{
+			ContentType: "application/json",
+			Body:        body,
+		},
+	)
+}

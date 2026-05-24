@@ -39,7 +39,7 @@ func (r *AvatarRepository) GetByID(ctx context.Context, id uuid.UUID) (*domain.A
 	query := `
 		SELECT id, user_id, original_url, file_size, content_type, status, error, created_at, updated_at
 		FROM avatars 
-		WHERE id = $1`
+		WHERE id = $1 AND deleted_at IS NULL`
 
 	var a domain.Avatar
 	err := r.db.QueryRow(ctx, query, id).Scan(
@@ -66,7 +66,7 @@ func (r *AvatarRepository) GetByUserID(ctx context.Context, userID uuid.UUID) ([
 	query := `
 		SELECT id, user_id, original_url, file_size, content_type, status, error, created_at, updated_at
 		FROM avatars 
-		WHERE user_id = $1 
+		WHERE user_id = $1 AND deleted_at IS NULL
 		ORDER BY created_at DESC`
 
 	rows, err := r.db.Query(ctx, query, userID)
@@ -114,7 +114,10 @@ func (r *AvatarRepository) Update(ctx context.Context, avatar *domain.Avatar) er
 }
 
 func (r *AvatarRepository) Delete(ctx context.Context, id uuid.UUID) error {
-	query := `DELETE FROM avatars WHERE id = $1`
+	query := `
+		UPDATE avatars 
+		SET deleted_at = NOW(), updated_at = NOW()
+		WHERE id = $1 AND deleted_at IS NULL`
 
 	result, err := r.db.Exec(ctx, query, id)
 	if err != nil {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/google/uuid"
+	"github.com/h2non/filetype"
 	"github.com/heavydash/my-avatars-service/internal/domain"
 	"github.com/heavydash/my-avatars-service/internal/events"
 	"github.com/heavydash/my-avatars-service/internal/pkg/logger"
@@ -44,16 +45,10 @@ func (s *AvatarService) UploadAvatar(ctx context.Context, userID uuid.UUID, file
 
 	// Разрешённые типы файлов
 	contentType := header.Header.Get("Content-Type")
-	allowedTypes := map[string]bool{
-		"image/jpeg":      true,
-		"image/png":       true,
-		"image/webp":      true,
-		"image/gif":       true,
-		"application/pdf": true,
-	}
 
-	if !allowedTypes[contentType] {
-		return nil, domain.ErrUnsupportedFormat
+	// Magic bytes валидация
+	if err := validateFileType(file, contentType); err != nil {
+		return nil, err
 	}
 
 	// Создаём доменную сущность
@@ -102,16 +97,23 @@ func (s *AvatarService) UploadAvatar(ctx context.Context, userID uuid.UUID, file
 
 // DeleteAvatar — удаление аватарки
 func (s *AvatarService) DeleteAvatar(ctx context.Context, id uuid.UUID) error {
+	// Получаем аватарку, чтобы проверить существование и получить ключ для MinIO
 	avatar, err := s.repo.GetByID(ctx, id)
 	if err != nil {
 		return err
 	}
 
-	// Удаляем файл из MinIO
-	if err := s.storage.Delete(ctx, avatar.ID.String()); err != nil {
-		s.logger.Warn("Failed to delete file from storage",
-			zap.String("avatar_id", avatar.ID.String()),
-			zap.Error(err))
+	// Публикуем событие для асинхронного удаления файлов из MinIO
+	if s.publisher != nil {
+		event := domain.AvatarDeleteEvent{
+			AvatarID: avatar.ID.String(),
+			S3Keys:   []string{avatar.ID.String()},
+		}
+		if err := s.publisher.PublishAvatarDeleted(ctx, event); err != nil {
+			s.logger.Warn("Failed to publish delete event",
+				zap.String("avatar_id", avatar.ID.String()),
+				zap.Error(err))
+		}
 	}
 
 	// Удаляем метаданные из БД
@@ -131,4 +133,43 @@ func (s *AvatarService) GetByUserID(ctx context.Context, userID uuid.UUID) ([]*d
 // GetByIDWithOptions — получение аватарки с параметрами размера и формата
 func (s *AvatarService) GetByIDWithOptions(ctx context.Context, id uuid.UUID, size, format string) (*domain.Avatar, error) {
 	return s.repo.GetByID(ctx, id)
+}
+
+// validateFileType — проверка magic bytes
+func validateFileType(file multipart.File, declaredContentType string) error {
+	// Читаем первые 512 байт
+	header := make([]byte, 512)
+	if _, err := file.Read(header); err != nil {
+		return fmt.Errorf("%w: %w", domain.ErrUnsupportedFormat, err)
+	}
+
+	// Возвращаем указатель обратно
+	if _, err := file.Seek(0, 0); err != nil {
+		return fmt.Errorf("failed to reset file pointer: %w", err)
+	}
+
+	// Проверяем реальный тип файла
+	kind, err := filetype.Match(header)
+	if err != nil {
+		return domain.ErrUnsupportedFormat
+	}
+
+	if kind == filetype.Unknown {
+		return domain.ErrUnsupportedFormat
+	}
+
+	// Разрешённые реальные типы
+	allowed := map[string]bool{
+		"image/jpeg":      true,
+		"image/png":       true,
+		"image/webp":      true,
+		"image/gif":       true,
+		"application/pdf": true,
+	}
+
+	if !allowed[kind.MIME.Value] {
+		return domain.ErrUnsupportedFormat
+	}
+
+	return nil
 }

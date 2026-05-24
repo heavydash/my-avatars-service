@@ -18,12 +18,12 @@ import (
 type AvatarService struct {
 	repo      repository.AvatarRepository
 	storage   storage.Storage
-	publisher *events.Publisher
+	publisher events.PublisherInterface
 	logger    logger.Logger
 }
 
 // NewAvatarService сервис добавления аватарок
-func NewAvatarService(repo repository.AvatarRepository, storage storage.Storage, publisher *events.Publisher, log logger.Logger) *AvatarService {
+func NewAvatarService(repo repository.AvatarRepository, storage storage.Storage, publisher events.PublisherInterface, log logger.Logger) *AvatarService {
 	return &AvatarService{
 		repo:      repo,
 		storage:   storage,

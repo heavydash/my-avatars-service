@@ -5,14 +5,13 @@ import (
 	"github.com/google/uuid"
 	"github.com/heavydash/my-avatars-service/internal/domain"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type AvatarRepository struct {
-	db *pgxpool.Pool
+	db DBPool
 }
 
-func NewAvatarRepository(db *pgxpool.Pool) *AvatarRepository {
+func NewAvatarRepository(db DBPool) *AvatarRepository {
 	return &AvatarRepository{db: db}
 }
 

@@ -13,7 +13,7 @@ import (
 )
 
 type MinIOStorage struct {
-	client *minio.Client
+	client MinIOClient
 	bucket string
 }
 

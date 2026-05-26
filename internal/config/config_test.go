@@ -40,6 +40,7 @@ func TestConfig_New(t *testing.T) {
 		assert.True(t, cfg.Server.Debug)
 		assert.Equal(t, "localhost:9000", cfg.MinIO.Endpoint)
 		assert.Equal(t, "avatars", cfg.MinIO.Bucket)
+		assert.Contains(t, cfg.RabbitMQ.URL, "amqp://guest:guest@localhost:5672/")
 	})
 
 	t.Run("env_override", func(t *testing.T) {
@@ -105,6 +106,9 @@ func TestConfig_Validate(t *testing.T) {
 					AccessKey: "minioadmin",
 					SecretKey: "minioadmin123",
 					Bucket:    "avatars",
+				},
+				RabbitMQ: RabbitMQConfig{
+					URL: "amqp://guest:guest@localhost:5672/",
 				},
 			},
 			wantErr: "",

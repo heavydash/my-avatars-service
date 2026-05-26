@@ -15,6 +15,7 @@ import (
 	"github.com/rabbitmq/amqp091-go"
 	"go.uber.org/zap"
 	"image"
+	"time"
 )
 
 type Worker struct {
@@ -90,28 +91,52 @@ func (w *Worker) Start() error {
 			zap.String("avatar_id", event.AvatarID),
 			zap.String("user_id", event.UserID))
 
+		avatarID, err := uuid.Parse(event.AvatarID)
+		if err != nil {
+			w.logger.Error("Invalid avatar ID format in event",
+				zap.String("avatar_id", event.AvatarID),
+				zap.Error(err))
+			msg.Nack(false, false) // битое сообщение — не возвращаем
+			continue
+		}
+
+		avatar, err := w.repo.GetByID(context.Background(), avatarID)
+		if err != nil {
+			if err == domain.ErrNotFound {
+				w.logger.Warn("avatar not found",
+					zap.String("avatar_id", event.AvatarID))
+				msg.Ack(false)
+				continue
+			}
+			w.logger.Error("Failed to get avatar", zap.Error(err))
+			msg.Nack(false, true)
+			continue
+		}
+
+		if avatar.Status == domain.AvatarStatusReady {
+			w.logger.Info("avatar already processed, skipping",
+				zap.String("avatar_id", event.AvatarID))
+			msg.Ack(false)
+			continue
+		}
+
 		// Здесь будет основная обработка
-		if err := w.processImage(event); err != nil {
+		if err := w.processImage(event, avatarID); err != nil {
 			w.logger.Error("Failed to process image", zap.Error(err))
 			msg.Nack(false, true) // возвращаем в очередь для retry
 			continue
 		}
 
-		msg.Ack(false) // подтверждаем обработку
+		msg.Ack(false) // успешно отработано
 	}
 
 	return nil
 }
 
 // processImage — основная обработка изображения
-func (w *Worker) processImage(event domain.AvatarUploadedEvent) error {
-	ctx := context.Background()
-
-	// Парсим ID один раз
-	avatarID, err := uuid.Parse(event.AvatarID)
-	if err != nil {
-		return fmt.Errorf("invalid avatar id format: %w", err)
-	}
+func (w *Worker) processImage(event domain.AvatarUploadedEvent, avatarID uuid.UUID) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
 
 	// Пропускаем обработку для не-изображений (например, PDF)
 	if !isImage(event.ContentType) {
@@ -122,13 +147,6 @@ func (w *Worker) processImage(event domain.AvatarUploadedEvent) error {
 		return w.updateAvatarStatus(ctx, avatarID, domain.AvatarStatusReady)
 	}
 
-	w.logger.Info("Starting image processing",
-		zap.String("avatar_id", event.AvatarID),
-		zap.String("content_type", event.ContentType))
-
-	// Скачиваем оригинал из MinIO
-	w.logger.Debug("Downloading original from MinIO",
-		zap.String("object", event.AvatarID))
 	file, err := w.minio.GetObject(ctx, event.AvatarID)
 	if err != nil {
 		return fmt.Errorf("failed to download original: %w", err)
@@ -195,6 +213,8 @@ func (w *Worker) updateAvatarStatus(ctx context.Context, avatarID uuid.UUID, sta
 	}
 
 	avatar.Status = status
+	avatar.UpdatedAt = time.Now().UTC()
+
 	return w.repo.Update(ctx, avatar)
 }
 

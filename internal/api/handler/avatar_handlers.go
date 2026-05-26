@@ -10,10 +10,10 @@ import (
 )
 
 type AvatarHandler struct {
-	service service.ServiceAvatar
+	service service.AvatarUseCase
 }
 
-func NewAvatarHandler(svc service.ServiceAvatar) *AvatarHandler {
+func NewAvatarHandler(svc service.AvatarUseCase) *AvatarHandler {
 	return &AvatarHandler{service: svc}
 }
 

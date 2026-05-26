@@ -76,7 +76,7 @@ func main() {
 	}
 
 	// Инициализация RabbitMQ
-	rabbitURL := "amqp://guest:guest@localhost:5672/"
+	rabbitURL := cfg.RabbitMQ.URL
 	rabbitMQ, err := events.NewRabbitMQ(rabbitURL)
 	if err != nil {
 		log.Error("Failed to connect to RabbitMQ", zap.Error(err))

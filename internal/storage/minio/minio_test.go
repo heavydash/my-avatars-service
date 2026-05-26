@@ -55,7 +55,10 @@ func TestMinIOStorage(t *testing.T) {
 
 	t.Run("Save success", func(t *testing.T) {
 		mockClient := &mockMinIOClient{}
-		s := &MinIOStorage{client: mockClient, bucket: cfg.MinIO.Bucket}
+		s := &MinIOStorage{client: mockClient,
+			bucket:  cfg.MinIO.Bucket,
+			baseURL: "http://localhost:9000",
+		}
 
 		fileContent := []byte("fake image")
 		file := &mockFile{Reader: bytes.NewReader(fileContent)}
@@ -88,7 +91,8 @@ func TestMinIOStorage(t *testing.T) {
 	})
 
 	t.Run("GetURL", func(t *testing.T) {
-		s := &MinIOStorage{bucket: "avatars"}
+		s := &MinIOStorage{bucket: "avatars",
+			baseURL: "http://localhost:9000"}
 		url := s.GetURL("user123/avatar.jpg")
 		assert.Equal(t, "http://localhost:9000/avatars/user123/avatar.jpg", url)
 	})

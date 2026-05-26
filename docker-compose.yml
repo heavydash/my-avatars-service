@@ -51,6 +51,51 @@ services:
       timeout: 5s
       retries: 5
 
+  server:
+    build: .
+    container_name: gophprofile-server
+    ports:
+      - "8085:8085"
+    command: /server
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_started
+      rabbitmq:
+        condition: service_started
+    environment:
+      - APP_ENV=development
+      - APP_PORT=8085
+      - DB_DSN=postgres://postgres:postgres@postgres:5432/gophprofile?sslmode=disable
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin123
+      - MINIO_BUCKET=avatars
+      - MINIO_USE_SSL=false
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+    restart: unless-stopped
+
+
+  worker:
+    build: .
+    container_name: gophprofile-worker
+    command: /worker
+    depends_on:
+      - postgres
+      - minio
+      - rabbitmq
+    environment:
+      - APP_ENV=development
+      - DB_DSN=postgres://postgres:postgres@postgres:5432/gophprofile?sslmode=disable
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin123
+      - MINIO_BUCKET=avatars
+      - MINIO_USE_SSL=false
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+    restart: unless-stopped
+
 volumes:
   postgres_data:
   minio_data:

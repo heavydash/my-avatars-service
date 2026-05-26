@@ -7,7 +7,7 @@ import (
 	"mime/multipart"
 )
 
-type ServiceAvatar interface {
+type AvatarUseCase interface {
 	UploadAvatar(ctx context.Context, userID uuid.UUID, file multipart.File, header *multipart.FileHeader) (*domain.Avatar, error)
 	GetByID(ctx context.Context, id uuid.UUID) (*domain.Avatar, error)
 	GetByIDWithOptions(ctx context.Context, id uuid.UUID, size, format string) (*domain.Avatar, error)

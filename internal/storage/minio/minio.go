@@ -13,8 +13,10 @@ import (
 )
 
 type MinIOStorage struct {
-	client MinIOClient
-	bucket string
+	client  MinIOClient
+	bucket  string
+	baseURL string
+	useSSL  bool
 }
 
 func NewMinIOStorage(cfg *config.Config) (storage.Storage, error) {
@@ -36,9 +38,16 @@ func NewMinIOStorage(cfg *config.Config) (storage.Storage, error) {
 		}
 	}
 
+	scheme := "http"
+	if cfg.MinIO.UseSSL {
+		scheme = "https"
+	}
+	baseURL := fmt.Sprintf("%s://%s", scheme, cfg.MinIO.Endpoint)
+
 	return &MinIOStorage{
-		client: client,
-		bucket: cfg.MinIO.Bucket,
+		client:  client,
+		bucket:  cfg.MinIO.Bucket,
+		baseURL: baseURL,
 	}, nil
 }
 
@@ -73,7 +82,7 @@ func (s *MinIOStorage) SaveFromBytes(ctx context.Context, objectName string, dat
 }
 
 func (s *MinIOStorage) GetURL(objectName string) string {
-	return fmt.Sprintf("http://localhost:9000/%s/%s", s.bucket, objectName)
+	return fmt.Sprintf("%s/%s/%s", s.baseURL, s.bucket, objectName)
 }
 
 func (s *MinIOStorage) Delete(ctx context.Context, objectName string) error {

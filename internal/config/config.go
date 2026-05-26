@@ -14,9 +14,10 @@ import (
 
 // Config — корневая структура конфигурации
 type Config struct {
-	Server ServerConfig `json:"server"`
-	DB     DBConfig     `json:"db"`
-	MinIO  MinIOConfig  `json:"minio"`
+	Server   ServerConfig   `json:"server"`
+	DB       DBConfig       `json:"db"`
+	MinIO    MinIOConfig    `json:"minio"`
+	RabbitMQ RabbitMQConfig `json:"rabbitmq"`
 }
 
 type ServerConfig struct {
@@ -45,6 +46,10 @@ type MinIOConfig struct {
 	SecretKey string `json:"secret_key"`
 	Bucket    string `json:"bucket"`
 	UseSSL    bool   `json:"use_ssl"`
+}
+
+type RabbitMQConfig struct {
+	URL string `json:"URL"`
 }
 
 // New — основная функция загрузки конфигурации
@@ -106,6 +111,9 @@ func defaultConfig() *Config {
 			Bucket:    "avatars",
 			UseSSL:    false,
 		},
+		RabbitMQ: RabbitMQConfig{
+			URL: "amqp://guest:guest@localhost:5672/",
+		},
 	}
 }
 
@@ -150,6 +158,11 @@ func overwriteFromEnv(cfg *Config) {
 	if v := os.Getenv("MINIO_USE_SSL"); v != "" {
 		cfg.MinIO.UseSSL = v == "true" || v == "1"
 	}
+
+	// RabbitMQ
+	if v := os.Getenv("RABBITMQ_URL"); v != "" {
+		cfg.RabbitMQ.URL = v
+	}
 }
 
 func (c *Config) Validate() error {
@@ -161,6 +174,9 @@ func (c *Config) Validate() error {
 	}
 	if c.MinIO.Endpoint == "" || c.MinIO.Bucket == "" {
 		return fmt.Errorf("minio endpoint and bucket are required")
+	}
+	if c.RabbitMQ.URL == "" {
+		return fmt.Errorf("rabbitmq url is required")
 	}
 	return nil
 }

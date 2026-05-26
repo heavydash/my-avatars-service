@@ -30,3 +30,12 @@ go.work.sum
 # Editor/IDE
 # .idea/
 # .vscode/
+
+# Test files
+test-avatar.*
+*.pdf
+*.jpg
+*.png
+*.webp
+*.gif
+.idea/

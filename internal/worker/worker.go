@@ -13,8 +13,8 @@ import (
 	"github.com/heavydash/my-avatars-service/internal/storage"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/rabbitmq/amqp091-go"
-	"go.uber.org/zap"
 	"image"
+	"log/slog"
 	"time"
 )
 
@@ -78,24 +78,30 @@ func (w *Worker) Start() error {
 	}
 
 	for msg := range msgs {
-		w.logger.Info("Received message", zap.String("body", string(msg.Body)))
+		w.logger.InfoCtx(context.Background(), "Received message",
+			"body", string(msg.Body),
+		)
 
 		var event domain.AvatarUploadedEvent
 		if err := json.Unmarshal(msg.Body, &event); err != nil {
-			w.logger.Error("Failed to unmarshal event", zap.Error(err))
+			w.logger.ErrorCtx(context.Background(), "Failed to unmarshal event",
+				"error", err,
+				"body", string(msg.Body),
+			)
 			msg.Nack(false, false) // не возвращаем в очередь
 			continue
 		}
 
-		w.logger.Info("Processing avatar",
-			zap.String("avatar_id", event.AvatarID),
-			zap.String("user_id", event.UserID))
+		w.logger.InfoCtx(context.Background(), "Processing avatar",
+			"avatar_id", event.AvatarID,
+			"user_id", event.UserID,
+		)
 
 		avatarID, err := uuid.Parse(event.AvatarID)
 		if err != nil {
 			w.logger.Error("Invalid avatar ID format in event",
-				zap.String("avatar_id", event.AvatarID),
-				zap.Error(err))
+				slog.String("avatar_id", event.AvatarID),
+				err)
 			msg.Nack(false, false) // битое сообщение — не возвращаем
 			continue
 		}
@@ -104,25 +110,25 @@ func (w *Worker) Start() error {
 		if err != nil {
 			if err == domain.ErrNotFound {
 				w.logger.Warn("avatar not found",
-					zap.String("avatar_id", event.AvatarID))
+					slog.String("avatar_id", event.AvatarID))
 				msg.Ack(false)
 				continue
 			}
-			w.logger.Error("Failed to get avatar", zap.Error(err))
+			w.logger.Error("Failed to get avatar", err)
 			msg.Nack(false, true)
 			continue
 		}
 
 		if avatar.Status == domain.AvatarStatusReady {
 			w.logger.Info("avatar already processed, skipping",
-				zap.String("avatar_id", event.AvatarID))
+				slog.String("avatar_id", event.AvatarID))
 			msg.Ack(false)
 			continue
 		}
 
 		// Здесь будет основная обработка
 		if err := w.processImage(event, avatarID); err != nil {
-			w.logger.Error("Failed to process image", zap.Error(err))
+			w.logger.Error("Failed to process image", err)
 			msg.Nack(false, true) // возвращаем в очередь для retry
 			continue
 		}
@@ -138,11 +144,17 @@ func (w *Worker) processImage(event domain.AvatarUploadedEvent, avatarID uuid.UU
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
+	w.logger.InfoCtx(ctx, "Starting image processing",
+		"avatar_id", event.AvatarID,
+		"content_type", event.ContentType,
+	)
+
 	// Пропускаем обработку для не-изображений (например, PDF)
 	if !isImage(event.ContentType) {
-		w.logger.Info("Skipping image processing for non-image file",
-			zap.String("content_type", event.ContentType),
-			zap.String("avatar_id", event.AvatarID))
+		w.logger.InfoCtx(ctx, "Skipping image processing for non-image file",
+			"content_type", event.ContentType,
+			"avatar_id", event.AvatarID,
+		)
 
 		return w.updateAvatarStatus(ctx, avatarID, domain.AvatarStatusReady)
 	}
@@ -167,12 +179,15 @@ func (w *Worker) processImage(event domain.AvatarUploadedEvent, avatarID uuid.UU
 	}
 
 	for sizeName, size := range sizes {
-		w.logger.Debug("Creating thumbnail", zap.String("size", sizeName))
+		w.logger.Debug("Creating thumbnail", slog.String("size", sizeName))
 		thumb := imaging.Resize(img, size.X, size.Y, imaging.Lanczos)
 
 		var buf bytes.Buffer
 		if err = imaging.Encode(&buf, thumb, imaging.JPEG); err != nil {
-			w.logger.Warn("Failed to encode thumbnail", zap.String("size", sizeName), zap.Error(err))
+			w.logger.WarnCtx(ctx, "Failed to encode thumbnail",
+				"size", sizeName,
+				"error", err,
+			)
 			continue
 		}
 
@@ -180,18 +195,19 @@ func (w *Worker) processImage(event domain.AvatarUploadedEvent, avatarID uuid.UU
 
 		if _, err = w.minio.SaveFromBytes(ctx, thumbKey, buf.Bytes(), "image/jpeg"); err != nil {
 			w.logger.Warn("Failed to save thumbnail",
-				zap.String("size", sizeName), zap.Error(err))
+				slog.String("size", sizeName), err)
 		} else {
-			w.logger.Info("Thumbnail saved", zap.String("size", sizeName))
+			w.logger.Info("Thumbnail saved", slog.String("size", sizeName))
 		}
 	}
 
 	// Обновляем статус
 	if err := w.updateAvatarStatus(ctx, avatarID, domain.AvatarStatusReady); err != nil {
-		w.logger.Warn("Failed to update avatar status", zap.Error(err))
+		w.logger.Warn("Failed to update avatar status", err)
 	}
 
-	w.logger.Info("Image processing completed successfully", zap.String("avatar_id", event.AvatarID))
+	w.logger.InfoCtx(ctx, "Image processing completed successfully",
+		"avatar_id", event.AvatarID)
 	return nil
 }
 

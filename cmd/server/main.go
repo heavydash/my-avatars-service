@@ -12,7 +12,6 @@ import (
 	"github.com/heavydash/my-avatars-service/internal/repository/postgres"
 	"github.com/heavydash/my-avatars-service/internal/service"
 	minio2 "github.com/heavydash/my-avatars-service/internal/storage/minio"
-	"go.uber.org/zap"
 	"net/http"
 	"os"
 	"os/signal"
@@ -37,16 +36,13 @@ func main() {
 		os.Exit(1)
 	}
 
-	log, err := logger.New(cfg)
-	if err != nil {
-		fmt.Printf("Failed to create logger: %v\n", err)
-		os.Exit(1)
-	}
+	log := logger.NewLogger(cfg.Server.Env)
 	defer log.Sync()
 
 	log.Info("Starting GophProfile service...",
-		zap.String("env", cfg.Server.Env),
-		zap.String("port", cfg.Server.Port),
+		"env", cfg.Server.Env,
+		"port", cfg.Server.Port,
+		"version", buildVersion,
 	)
 
 	// Инициализация БД
@@ -55,7 +51,7 @@ func main() {
 
 	dbPool, err := postgres.New(initCtx, cfg)
 	if err != nil {
-		log.Error("Failed to create connection pool", zap.Error(err))
+		log.Error("Failed to create connection pool", "error", err)
 		os.Exit(1)
 	}
 	defer dbPool.Close()
@@ -65,13 +61,13 @@ func main() {
 	// Инициализация репозитория и storage
 	avatarRepo, err := repository.NewAvatarRepository(cfg, dbPool.Pool)
 	if err != nil {
-		log.Error("Failed to create avatar repository", zap.Error(err))
+		log.Error("Failed to create avatar repository", "error", err)
 		os.Exit(1)
 	}
 
 	fileStorage, err := minio2.NewMinIOStorage(cfg)
 	if err != nil {
-		log.Error("Failed to create minio storage", zap.Error(err))
+		log.Error("Failed to create minio storage", "error", err)
 		os.Exit(1)
 	}
 
@@ -79,7 +75,7 @@ func main() {
 	rabbitURL := cfg.RabbitMQ.URL
 	rabbitMQ, err := events.NewRabbitMQ(rabbitURL)
 	if err != nil {
-		log.Error("Failed to connect to RabbitMQ", zap.Error(err))
+		log.Error("Failed to connect to RabbitMQ", "error", err)
 	} else {
 		log.Info("Successfully connected to RabbitMQ")
 		defer rabbitMQ.Close()
@@ -94,14 +90,22 @@ func main() {
 	// Сервис
 	avatarService := service.NewAvatarService(avatarRepo, fileStorage, publisher, log)
 
+	jwtService := service.NewJWTService(
+		cfg.JWT.Secret,
+		cfg.JWT.AccessTTL,
+		cfg.JWT.Issuer,
+	)
+
+	// TestToken
+	authHandler := handler.NewAuthHandler(jwtService)
+
 	// Handler
-	avatarHandler := handler.NewAvatarHandler(avatarService)
+	avatarHandler := handler.NewAvatarHandler(avatarService, service.JWTService{})
 
 	log.Info("All layers initialized successfully")
 
 	// Настройка роутера Gin
-	r := api.NewRouter(avatarHandler, log)
-
+	r := api.NewRouter(avatarHandler, authHandler, jwtService, log)
 	// HTTP сервер
 	srv := &http.Server{
 		Addr:    cfg.Server.Addr(),
@@ -110,9 +114,9 @@ func main() {
 
 	// Запуск сервера в горутине
 	go func() {
-		log.Info("HTTP server starting", zap.String("address", srv.Addr))
+		log.Info("HTTP server starting", "address", srv.Addr)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatal("Server failed", zap.Error(err))
+			log.Warn("Server failed", "error", err)
 		}
 	}()
 
@@ -126,7 +130,7 @@ func main() {
 	defer cancel()
 
 	if err := srv.Shutdown(ctx); err != nil {
-		log.Error("Server forced to shutdown", zap.Error(err))
+		log.Error("Server forced to shutdown", "error", err)
 	}
 
 	log.Info("Server exited gracefully")

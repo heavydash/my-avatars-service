@@ -19,10 +19,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/heavydash/my-avatars-service/internal/domain"
-	"github.com/heavydash/my-avatars-service/internal/pkg/logger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"go.uber.org/zap/zapcore"
 	"mime/multipart"
 )
 
@@ -149,27 +147,30 @@ type mockLogger struct {
 }
 
 // Debug мокирует debug-логирование.
-func (m *mockLogger) Debug(msg string, fields ...zapcore.Field) { m.Called(msg, fields) }
+func (m *mockLogger) Debug(msg string, args ...any) { m.Called(msg, args) }
 
 // Info мокирует info-логирование.
-func (m *mockLogger) Info(msg string, fields ...zapcore.Field) { m.Called(msg, fields) }
+func (m *mockLogger) Info(msg string, args ...any) { m.Called(msg, args) }
 
 // Warn мокирует warning-логирование.
-func (m *mockLogger) Warn(msg string, fields ...zapcore.Field) { m.Called(msg, fields) }
+func (m *mockLogger) Warn(msg string, args ...any) { m.Called(msg, args) }
 
 // Error мокирует error-логирование.
-func (m *mockLogger) Error(msg string, fields ...zapcore.Field) { m.Called(msg, fields) }
+func (m *mockLogger) Error(msg string, args ...any) { m.Called(msg, args) }
 
-// Fatal мокирует fatal-логирование.
-func (m *mockLogger) Fatal(msg string, fields ...zapcore.Field) { m.Called(msg, fields) }
+// InfoCtx - мокирует InfoCtx-логгирование (Info с context)
+func (m *mockLogger) InfoCtx(ctx context.Context, msg string, args ...any) {
+	m.Called(ctx, msg, args)
+}
 
-// With мокирует создание дочернего логгера с дополнительными полями.
-func (m *mockLogger) With(fields ...zapcore.Field) logger.Logger {
-	args := m.Called(fields)
-	if l := args.Get(0); l != nil {
-		return l.(logger.Logger)
-	}
-	return m
+// WarnCtx мокирует WarnCtx (Warn с context))
+func (m *mockLogger) WarnCtx(ctx context.Context, msg string, args ...any) {
+	m.Called(ctx, msg, args)
+}
+
+// ErrorCtx - мокирует ErrorCtx-логгирование (Error с context)
+func (m *mockLogger) ErrorCtx(ctx context.Context, msg string, args ...any) {
+	m.Called(ctx, msg, args)
 }
 
 // Sync мокирует сброс буферов логгера.

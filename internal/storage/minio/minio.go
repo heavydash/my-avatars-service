@@ -8,6 +8,7 @@ import (
 	"github.com/heavydash/my-avatars-service/internal/storage"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
+	"go.opentelemetry.io/otel"
 	"io"
 	"mime/multipart"
 )
@@ -52,6 +53,10 @@ func NewMinIOStorage(cfg *config.Config) (storage.Storage, error) {
 }
 
 func (s *MinIOStorage) Save(ctx context.Context, objectName string, file multipart.File, header *multipart.FileHeader) (string, error) {
+	tracer := otel.Tracer("gophprofile.storage")
+	ctx, span := tracer.Start(ctx, "MinIOStorage.Save")
+	defer span.End()
+
 	_, err := s.client.PutObject(ctx, s.bucket, objectName, file, header.Size, minio.PutObjectOptions{
 		ContentType: header.Header.Get("Content-Type"),
 	})
@@ -73,6 +78,10 @@ func (s *MinIOStorage) GetObject(ctx context.Context, objectName string) (io.Rea
 
 // SaveFromBytes сохраняет байты напрямую
 func (s *MinIOStorage) SaveFromBytes(ctx context.Context, objectName string, data []byte, contentType string) (string, error) {
+	tracer := otel.Tracer("gophprofile.storage")
+	ctx, span := tracer.Start(ctx, "MinIOStorage.SaveFromBytes")
+	defer span.End()
+
 	_, err := s.client.PutObject(ctx, s.bucket, objectName, bytes.NewReader(data), int64(len(data)),
 		minio.PutObjectOptions{ContentType: contentType})
 	if err != nil {

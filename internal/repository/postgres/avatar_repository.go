@@ -5,6 +5,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/heavydash/my-avatars-service/internal/domain"
 	"github.com/jackc/pgx/v5"
+	"go.opentelemetry.io/otel"
 )
 
 type AvatarRepository struct {
@@ -16,6 +17,10 @@ func NewAvatarRepository(db DBPool) *AvatarRepository {
 }
 
 func (r *AvatarRepository) Create(ctx context.Context, avatar *domain.Avatar) error {
+	tracer := otel.Tracer("gophprofile.repository")
+	ctx, span := tracer.Start(ctx, "PostgresAvatarRepository.Create")
+	defer span.End()
+
 	query := `
 		INSERT INTO avatars (id, user_id, original_url, file_size, content_type, status, error, created_at, updated_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`
@@ -35,6 +40,10 @@ func (r *AvatarRepository) Create(ctx context.Context, avatar *domain.Avatar) er
 }
 
 func (r *AvatarRepository) GetByID(ctx context.Context, id uuid.UUID) (*domain.Avatar, error) {
+	tracer := otel.Tracer("gophprofile.repository")
+	ctx, span := tracer.Start(ctx, "PostgresAvatarRepository.GetByID")
+	defer span.End()
+
 	query := `
 		SELECT id, user_id, original_url, file_size, content_type, status, error, created_at, updated_at
 		FROM avatars 
@@ -62,6 +71,10 @@ func (r *AvatarRepository) GetByID(ctx context.Context, id uuid.UUID) (*domain.A
 }
 
 func (r *AvatarRepository) GetByUserID(ctx context.Context, userID uuid.UUID) ([]*domain.Avatar, error) {
+	tracer := otel.Tracer("gophprofile.repository")
+	ctx, span := tracer.Start(ctx, "PostgresAvatarRepository.GetByUserID")
+	defer span.End()
+
 	query := `
 		SELECT id, user_id, original_url, file_size, content_type, status, error, created_at, updated_at
 		FROM avatars 
@@ -113,6 +126,10 @@ func (r *AvatarRepository) Update(ctx context.Context, avatar *domain.Avatar) er
 }
 
 func (r *AvatarRepository) Delete(ctx context.Context, id uuid.UUID) error {
+	tracer := otel.Tracer("gophprofile.repository")
+	ctx, span := tracer.Start(ctx, "PostgresAvatarRepository.Delete")
+	defer span.End()
+
 	query := `
 		UPDATE avatars 
 		SET deleted_at = NOW(), updated_at = NOW()

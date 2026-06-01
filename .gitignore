@@ -40,3 +40,8 @@ test-avatar.*
 *.gif
 .idea/
 .idea/
+
+# IDE
+.idea/
+*.iml
+.vscode/

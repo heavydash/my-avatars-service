@@ -9,6 +9,7 @@ import (
 	"github.com/heavydash/my-avatars-service/internal/config"
 	"github.com/heavydash/my-avatars-service/internal/events"
 	"github.com/heavydash/my-avatars-service/internal/pkg/logger"
+	"github.com/heavydash/my-avatars-service/internal/pkg/tracing"
 	"github.com/heavydash/my-avatars-service/internal/repository"
 	"github.com/heavydash/my-avatars-service/internal/repository/postgres"
 	"github.com/heavydash/my-avatars-service/internal/service"
@@ -39,6 +40,11 @@ func main() {
 	}
 
 	log := logger.NewLogger(cfg.Server.Env)
+	if err := tracing.InitTracer("gophprofile"); err != nil {
+		log.Error("Failed to initialize OpenTelemetry tracer", "error", err)
+	} else {
+		log.Info("OpenTelemetry tracer initialized successfully")
+	}
 	defer log.Sync()
 
 	log.Info("Starting GophProfile service...",

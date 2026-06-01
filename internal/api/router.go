@@ -20,6 +20,8 @@ func NewRouter(
 	// Глобальные Middleware
 	r.Use(gin.Recovery())
 
+	r.Use(middleware.PrometheusMiddleware())
+
 	// Кастомный structured logger
 	r.Use(middleware.StructuredLogger(log))
 

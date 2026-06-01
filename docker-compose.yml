@@ -126,6 +126,29 @@ services:
     depends_on:
       - prometheus
 
+  loki:
+    image: grafana/loki:3.0.0
+    container_name: gophprofile-loki
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - ./loki-config.yaml:/etc/loki/local-config.yaml
+    networks:
+      - default
+
+  promtail:
+      image: grafana/promtail:3.0.0
+      container_name: gophprofile-promtail
+      volumes:
+        - /var/run/docker.sock:/var/run/docker.sock
+        - ./promtail-config.yaml:/etc/promtail/config.yml
+      command: -config.file=/etc/promtail/config.yml
+      depends_on:
+        - loki
+      networks:
+        - default
+
 volumes:
   postgres_data:
   minio_data:

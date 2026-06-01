@@ -40,10 +40,12 @@ func main() {
 	}
 
 	log := logger.NewLogger(cfg.Server.Env)
-	if err := tracing.InitTracer("gophprofile"); err != nil {
+	if err := tracing.InitTracer(&cfg.Observability); err != nil {
 		log.Error("Failed to initialize OpenTelemetry tracer", "error", err)
 	} else {
-		log.Info("OpenTelemetry tracer initialized successfully")
+		log.Info("OpenTelemetry tracer initialized successfully",
+			"service", cfg.Observability.OTELServiceName,
+			"endpoint", cfg.Observability.OTELExporter)
 	}
 	defer log.Sync()
 

@@ -8,6 +8,7 @@ import (
 	"github.com/heavydash/my-avatars-service/internal/domain"
 	"github.com/heavydash/my-avatars-service/internal/events"
 	"github.com/heavydash/my-avatars-service/internal/pkg/logger"
+	"github.com/heavydash/my-avatars-service/internal/pkg/metrics"
 	"github.com/heavydash/my-avatars-service/internal/repository"
 	"github.com/heavydash/my-avatars-service/internal/storage"
 	"log/slog"
@@ -80,6 +81,10 @@ func (s *AvatarService) UploadAvatar(ctx context.Context, userID uuid.UUID, file
 		return nil, domain.ErrInternal
 	}
 
+	metrics.AvatarUploadsTotal.WithLabelValues("success").Inc()
+	metrics.StorageUsageBytes.WithLabelValues(userID.String()).Add(float64(header.Size))
+	metrics.StorageObjectsTotal.Inc()
+
 	// Публикуем событие для асинхронной обработки
 	if s.publisher != nil {
 		event := domain.AvatarUploadedEvent{
@@ -108,8 +113,18 @@ func (s *AvatarService) DeleteAvatar(ctx context.Context, id uuid.UUID) error {
 	// Получаем аватарку, чтобы проверить существование и получить ключ для MinIO
 	avatar, err := s.repo.GetByID(ctx, id)
 	if err != nil {
+		if err == domain.ErrNotFound {
+			metrics.AvatarDeletesTotal.WithLabelValues("not_found").Inc()
+		} else {
+			metrics.AvatarDeletesTotal.WithLabelValues("failed").Inc()
+		}
 		return err
 	}
+
+	s.logger.InfoCtx(ctx, "Starting avatar deletion",
+		"avatar_id", avatar.ID,
+		"user_id", avatar.UserID,
+	)
 
 	// Публикуем событие для асинхронного удаления файлов из MinIO
 	if s.publisher != nil {
@@ -125,7 +140,22 @@ func (s *AvatarService) DeleteAvatar(ctx context.Context, id uuid.UUID) error {
 	}
 
 	// Удаляем метаданные из БД
-	return s.repo.Delete(ctx, id)
+	if err := s.repo.Delete(ctx, id); err != nil {
+		metrics.AvatarDeletesTotal.WithLabelValues("failed").Inc()
+		s.logger.ErrorCtx(ctx, "Failed to delete avatar from database", "error", err, "avatar_id", avatar.ID)
+		return err
+	}
+
+	metrics.AvatarDeletesTotal.WithLabelValues("success").Inc()
+	metrics.StorageUsageBytes.WithLabelValues(avatar.UserID.String()).Sub(float64(avatar.FileSize))
+	metrics.StorageObjectsTotal.Dec()
+
+	s.logger.InfoCtx(ctx, "Avatar deleted successfully",
+		"avatar_id", avatar.ID,
+		"user_id", avatar.UserID,
+	)
+
+	return nil
 }
 
 // GetByID — получение аватарки по ID

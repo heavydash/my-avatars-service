@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/gin-gonic/gin"
 	"github.com/heavydash/my-avatars-service/internal/api"
 	"github.com/heavydash/my-avatars-service/internal/api/handler"
 	"github.com/heavydash/my-avatars-service/internal/config"
@@ -12,6 +13,7 @@ import (
 	"github.com/heavydash/my-avatars-service/internal/repository/postgres"
 	"github.com/heavydash/my-avatars-service/internal/service"
 	minio2 "github.com/heavydash/my-avatars-service/internal/storage/minio"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"net/http"
 	"os"
 	"os/signal"
@@ -106,6 +108,13 @@ func main() {
 
 	// Настройка роутера Gin
 	r := api.NewRouter(avatarHandler, authHandler, jwtService, log)
+
+	// metrics endpoint
+	r.GET("/metrics", func(c *gin.Context) {
+		// Prometheus handler
+		promhttp.Handler().ServeHTTP(c.Writer, c.Request)
+	})
+
 	// HTTP сервер
 	srv := &http.Server{
 		Addr:    cfg.Server.Addr(),

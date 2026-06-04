@@ -2,6 +2,7 @@ package logger
 
 import (
 	"context"
+	"github.com/heavydash/my-avatars-service/internal/config"
 	"go.opentelemetry.io/otel/trace"
 	"log/slog"
 	"os"
@@ -27,15 +28,15 @@ type slogLogger struct {
 }
 
 // NewLogger создаёт логгер в зависимости от окружения
-func NewLogger(env string) Logger {
+func NewLogger(cfg *config.ObservabilityConfig) Logger {
 	var handler slog.Handler
 
 	opts := &slog.HandlerOptions{
-		Level:     parseLevel(env),
-		AddSource: env == "development",
+		Level:     parseLevel(cfg.LogLevel),
+		AddSource: cfg.Environment == "development",
 	}
 
-	if env == "development" {
+	if cfg.Environment == "development" {
 		handler = slog.NewTextHandler(os.Stdout, opts)
 	} else {
 		handler = slog.NewJSONHandler(os.Stdout, opts)

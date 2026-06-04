@@ -15,6 +15,7 @@ import (
 	"github.com/heavydash/my-avatars-service/internal/service"
 	minio2 "github.com/heavydash/my-avatars-service/internal/storage/minio"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"net/http"
 	"os"
 	"os/signal"
@@ -25,6 +26,8 @@ var (
 	buildVersion = "dev"
 	buildDate    = "unknown"
 	buildCommit  = "unknown"
+
+	tracerProvider *sdktrace.TracerProvider
 )
 
 func main() {
@@ -39,15 +42,20 @@ func main() {
 		os.Exit(1)
 	}
 
-	log := logger.NewLogger(cfg.Server.Env)
-	if err := tracing.InitTracer(&cfg.Observability); err != nil {
+	log := logger.NewLogger(&cfg.Observability)
+	defer log.Sync()
+
+	// Tracing
+	tracerProvider, err = tracing.InitTracer(&cfg.Observability)
+	if err != nil {
 		log.Error("Failed to initialize OpenTelemetry tracer", "error", err)
 	} else {
 		log.Info("OpenTelemetry tracer initialized successfully",
 			"service", cfg.Observability.OTELServiceName,
-			"endpoint", cfg.Observability.OTELExporter)
+			"used_endpoint", "localhost:4317",
+			"endpoint", cfg.Observability.OTELExporter,
+		)
 	}
-	defer log.Sync()
 
 	log.Info("Starting GophProfile service...",
 		"env", cfg.Server.Env,
@@ -115,7 +123,7 @@ func main() {
 	log.Info("All layers initialized successfully")
 
 	// Настройка роутера Gin
-	r := api.NewRouter(avatarHandler, authHandler, jwtService, log)
+	r := api.NewRouter(avatarHandler, authHandler, jwtService, log, cfg.Server.Env)
 
 	// metrics endpoint
 	r.GET("/metrics", func(c *gin.Context) {
@@ -133,7 +141,8 @@ func main() {
 	go func() {
 		log.Info("HTTP server starting", "address", srv.Addr)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Warn("Server failed", "error", err)
+			log.Error("Server failed", "error", err)
+			os.Exit(1)
 		}
 	}()
 
@@ -145,6 +154,15 @@ func main() {
 
 	ctx, cancel := context.WithTimeout(context.Background(), cfg.Server.ShutdownTimeout)
 	defer cancel()
+
+	// Shutdown Tracer
+	if tracerProvider != nil {
+		if err := tracerProvider.Shutdown(ctx); err != nil {
+			log.Error("Failed to shutdown tracer provider", "error", err)
+		} else {
+			log.Info("Tracer provider shutdown gracefully")
+		}
+	}
 
 	if err := srv.Shutdown(ctx); err != nil {
 		log.Error("Server forced to shutdown", "error", err)

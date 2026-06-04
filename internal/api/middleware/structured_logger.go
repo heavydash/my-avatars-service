@@ -9,6 +9,11 @@ import (
 // StructuredLogger — middleware для Gin, который использует наш slog
 func StructuredLogger(log logger.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		if c.Request.URL.Path == "/metrics" || c.Request.URL.Path == "/health" {
+			c.Next()
+			return
+		}
+
 		// Запоминаем время начала
 		start := time.Now()
 

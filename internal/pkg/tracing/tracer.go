@@ -2,9 +2,11 @@ package tracing
 
 import (
 	"context"
+	"fmt"
 	"github.com/heavydash/my-avatars-service/internal/config"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	"go.opentelemetry.io/otel/sdk/resource"
+	"strings"
 
 	"go.opentelemetry.io/otel"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
@@ -12,19 +14,26 @@ import (
 )
 
 // InitTracer инициализирует OpenTelemetry tracer с экспортом в Jaeger
-func InitTracer(cfg *config.ObservabilityConfig) error {
+func InitTracer(cfg *config.ObservabilityConfig) (*sdktrace.TracerProvider, error) {
 	endpoint := cfg.OTELExporter
 	if endpoint == "" {
+		endpoint = "localhost:4317"
+	}
+
+	endpoint = strings.TrimPrefix(endpoint, "http://")
+	endpoint = strings.TrimPrefix(endpoint, "https://")
+
+	if strings.Contains(endpoint, "jaeger") || endpoint == "" {
 		endpoint = "localhost:4317"
 	}
 
 	// Создаём exporter в Jaeger
 	exporter, err := otlptracegrpc.New(context.Background(),
 		otlptracegrpc.WithInsecure(), // для локальной разработки
-		otlptracegrpc.WithEndpoint("localhost:4317"),
+		otlptracegrpc.WithEndpoint(endpoint),
 	)
 	if err != nil {
-		return err
+		return nil, fmt.Errorf("failed to create OTLP exporter: %w", err)
 	}
 
 	serviceName := cfg.OTELServiceName
@@ -42,5 +51,5 @@ func InitTracer(cfg *config.ObservabilityConfig) error {
 	)
 
 	otel.SetTracerProvider(tp)
-	return nil
+	return tp, nil
 }

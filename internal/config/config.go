@@ -91,7 +91,13 @@ func newWithFlags(fs *flag.FlagSet) (*Config, error) {
 
 	loadDotEnv()
 
-	overwriteFromEnv(cfg)
+	if err := overwriteFromEnv(cfg); err != nil {
+		return nil, fmt.Errorf("failed to overwrite config from env: %w", err)
+	}
+
+	if err := cfg.Validate(); err != nil {
+		return nil, fmt.Errorf("config validation failed: %w", err)
+	}
 
 	if err := cfg.Validate(); err != nil {
 		return nil, fmt.Errorf("config validation failed: %w", err)
@@ -155,7 +161,7 @@ func loadDotEnv() {
 	}
 }
 
-func overwriteFromEnv(cfg *Config) {
+func overwriteFromEnv(cfg *Config) error {
 	// Server
 	if v := os.Getenv("APP_PORT"); v != "" {
 		cfg.Server.Port = v
@@ -200,6 +206,8 @@ func overwriteFromEnv(cfg *Config) {
 	if v := os.Getenv("JWT_ACCESS_TTL"); v != "" {
 		if d, err := time.ParseDuration(v); err == nil {
 			cfg.JWT.AccessTTL = d
+		} else {
+			return fmt.Errorf("invalid JWT_ACCESS_TTL value '%s': %w", v, err)
 		}
 	}
 	if v := os.Getenv("JWT_ISSUER"); v != "" {
@@ -221,6 +229,7 @@ func overwriteFromEnv(cfg *Config) {
 	if v := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT"); v != "" {
 		cfg.Observability.OTELExporter = v
 	}
+	return nil
 }
 
 func (c *Config) Validate() error {

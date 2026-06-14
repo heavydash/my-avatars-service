@@ -16,6 +16,10 @@ func NewPublisher(ch *amqp091.Channel) *Publisher {
 }
 
 func (p *Publisher) PublishAvatarUploaded(ctx context.Context, event domain.AvatarUploadedEvent) error {
+	if p.ch == nil {
+		return nil // не падаем, если RabbitMQ не подключен
+	}
+
 	body, err := json.Marshal(event)
 	if err != nil {
 		return err
@@ -35,6 +39,10 @@ func (p *Publisher) PublishAvatarUploaded(ctx context.Context, event domain.Avat
 
 // PublishAvatarDeleted — публикует событие удаления
 func (p *Publisher) PublishAvatarDeleted(ctx context.Context, event domain.AvatarDeleteEvent) error {
+	if p.ch == nil {
+		return nil
+	}
+
 	body, err := json.Marshal(event)
 	if err != nil {
 		return err

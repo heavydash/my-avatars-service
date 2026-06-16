@@ -1,0 +1,12 @@
+apiVersion: v2
+name: gophprofile
+description: GophProfile - User Avatar Management Microservice
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+
+dependencies:
+  - name: jaeger
+    version: "4.11.1"
+    repository: "https://jaegertracing.github.io/helm-charts"
+    condition: jaeger.enabled

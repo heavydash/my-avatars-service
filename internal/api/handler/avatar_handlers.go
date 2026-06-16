@@ -7,6 +7,7 @@ import (
 	"github.com/heavydash/my-avatars-service/internal/api/middleware"
 	"github.com/heavydash/my-avatars-service/internal/domain"
 	"github.com/heavydash/my-avatars-service/internal/service"
+	"log"
 	"net/http"
 )
 
@@ -22,7 +23,18 @@ func NewAvatarHandler(svc service.AvatarUseCase, jwtService service.JWTService) 
 	}
 }
 
-// UploadAvatar — загрузка аватарки
+// UploadAvatar загружает аватарку пользователя
+// @Summary      Загрузить аватарку
+// @Description  Загружает файл аватарки (jpg, png, webp). Требуется авторизация.
+// @Tags         avatars
+// @Accept       multipart/form-data
+// @Produce      json
+// @Param        file  formData  file  true  "Файл аватарки"
+// @Success      201   {object}  domain.Avatar
+// @Failure      400   {object}  map[string]string  "Неверный файл или формат"
+// @Failure      401   {object}  map[string]string  "Не авторизован"
+// @Failure      413   {object}  map[string]string  "Файл слишком большой"
+// @Router       /api/v1/avatars [post]
 func (h *AvatarHandler) UploadAvatar(c *gin.Context) {
 	// Берём user_id из JWT
 	userIDStr, exists := middleware.GetUserID(c)
@@ -60,7 +72,18 @@ func (h *AvatarHandler) UploadAvatar(c *gin.Context) {
 	c.JSON(http.StatusCreated, avatar)
 }
 
-// GetAvatar — получение одной аватарки
+// GetAvatar отдаёт аватарку (редирект на файл)
+// @Summary      Получить аватарку
+// @Description  Возвращает редирект на оригинал или миниатюру аватарки
+// @Tags         avatars
+// @Produce      json
+// @Param        id     path      string  true  "ID аватарки"
+// @Param        size   query     string  false "Размер миниатюры (100x100, 300x300)"
+// @Param        format query     string  false "Формат (jpg, webp)"
+// @Success      307   "Редирект на файл"
+// @Failure      400   {object}  map[string]string
+// @Failure      404   {object}  map[string]string  "Аватарка не найдена"
+// @Router       /api/v1/avatars/{id} [get]
 func (h *AvatarHandler) GetAvatar(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
@@ -91,7 +114,14 @@ func (h *AvatarHandler) GetAvatar(c *gin.Context) {
 	c.Redirect(http.StatusTemporaryRedirect, url)
 }
 
-// GetUserAvatars — получение аватарок пользователя
+// GetUserAvatars возвращает все аватарки пользователя
+// @Summary      Получить все аватарки пользователя
+// @Tags         avatars
+// @Produce      json
+// @Param        user_id  query  string  true  "ID пользователя"
+// @Success      200  {array}   domain.Avatar
+// @Failure      400  {object}  map[string]string
+// @Router       /api/v1/avatars [get]
 func (h *AvatarHandler) GetUserAvatars(c *gin.Context) {
 	userIDStr := c.Query("user_id")
 	if userIDStr == "" {
@@ -108,6 +138,7 @@ func (h *AvatarHandler) GetUserAvatars(c *gin.Context) {
 	// Получаем последнюю аватарку пользователя
 	avatars, err := h.service.GetByUserID(c.Request.Context(), userID)
 	if err != nil {
+		log.Printf("GetByUserID error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": domain.ErrInternal.Error()})
 		return
 	}
@@ -115,7 +146,14 @@ func (h *AvatarHandler) GetUserAvatars(c *gin.Context) {
 	c.JSON(http.StatusOK, avatars)
 }
 
-// GetUserAvatar — эндпоинт последней аватарки пользователя
+// GetUserAvatar отдаёт последнюю аватарку пользователя (редирект)
+// @Summary      Получить последнюю аватарку пользователя
+// @Tags         avatars
+// @Produce      json
+// @Param        user_id  path  string  true  "ID пользователя"
+// @Success      307  "Редирект на аватарку"
+// @Failure      400  {object}  map[string]string
+// @Router       /api/v1/users/{user_id}/avatar [get]
 func (h *AvatarHandler) GetUserAvatar(c *gin.Context) {
 	userIDStr := c.Param("user_id")
 	if userIDStr == "" {
@@ -145,7 +183,19 @@ func (h *AvatarHandler) GetUserAvatar(c *gin.Context) {
 	c.Redirect(http.StatusTemporaryRedirect, latest.OriginalURL)
 }
 
-// DeleteAvatar — удаление аватарки
+// DeleteAvatar удаляет аватарку
+// @Summary      Удалить аватарку
+// @Description  Удаляет аватарку. Можно удалять только свои аватарки.
+// @Tags         avatars
+// @Produce      json
+// @Param        id          path   string  true  "ID аватарки"
+// @Param        X-User-ID   header string  true  "ID пользователя"
+// @Success      204  "Аватарка удалена"
+// @Failure      400  {object}  map[string]string
+// @Failure      401  {object}  map[string]string
+// @Failure      403  {object}  map[string]string  "Нет прав на удаление"
+// @Failure      404  {object}  map[string]string  "Аватарка не найдена"
+// @Router       /api/v1/avatars/{id} [delete]
 func (h *AvatarHandler) DeleteAvatar(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
@@ -195,7 +245,15 @@ func (h *AvatarHandler) DeleteAvatar(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
-// GetAvatarMetadata — получение метаданных аватарки
+// GetAvatarMetadata возвращает метаданные аватарки
+// @Summary      Получить метаданные аватарки
+// @Tags         avatars
+// @Produce      json
+// @Param        id  path  string  true  "ID аватарки"
+// @Success      200  {object}  map[string]interface{}
+// @Failure      400  {object}  map[string]string
+// @Failure      404  {object}  map[string]string
+// @Router       /api/v1/avatars/{id}/metadata [get]
 func (h *AvatarHandler) GetAvatarMetadata(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)

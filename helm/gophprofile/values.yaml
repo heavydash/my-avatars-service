@@ -1,0 +1,63 @@
+replicaCount: 2
+
+image:
+  repository: gophprofile/server
+  pullPolicy: IfNotPresent
+  tag: "latest"
+
+serviceAccount:
+  create: true
+  name: avatar-server-sa
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8085
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+hpa:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  cpuUtilization: 65
+  memoryUtilization: 75
+
+serviceMonitor:
+  enabled: false
+  interval: 15s
+  scrapeTimeout: 10s
+
+jaeger:
+  enabled: true
+
+  fullnameOverride: jaeger
+
+  collector:
+    enabled: true
+
+  query:
+    enabled: true
+
+  agent:
+    enabled: true
+
+  storage:
+    type: memory
+
+collector:
+    env:
+      - name: COLLECTOR_OTLP_ENABLED
+        value: "true"

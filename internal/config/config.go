@@ -61,12 +61,13 @@ type JWTConfig struct {
 }
 
 type ObservabilityConfig struct {
-	Environment     string  `json:"environment"`
-	LogLevel        string  `json:"log_level"`
-	MetricsPath     string  `json:"metrics_path"`
-	OTELServiceName string  `json:"otel_service_name"`
-	OTELExporter    string  `json:"otel_exporter_otlp"`
-	TraceSampling   float64 `json:"trace_sampling_ratio"`
+	Environment     string        `json:"environment"`
+	LogLevel        string        `json:"log_level"`
+	MetricsPath     string        `json:"metrics_path"`
+	OTELServiceName string        `json:"otel_service_name"`
+	OTELExporter    string        `json:"otel_exporter_otlp"`
+	TraceSampling   float64       `json:"trace_sampling_ratio"`
+	OTELTimeout     time.Duration `json:"otel_timeout" env:"OTEL_TIMEOUT" envDefault:"3s"`
 }
 
 // New — основная функция загрузки конфигурации
@@ -138,7 +139,7 @@ func defaultConfig() *Config {
 			URL: "amqp://guest:guest@localhost:5672/",
 		},
 		JWT: JWTConfig{
-			Secret:    "secret",
+			Secret:    "this-is-a-very-long-jwt-secret-key-for-development-and-testing-purposes-1234567890",
 			AccessTTL: 24 * time.Hour,
 			Issuer:    "goph",
 		},
@@ -149,6 +150,7 @@ func defaultConfig() *Config {
 			OTELServiceName: "gophprofile",
 			OTELExporter:    "http://jaeger:4317",
 			TraceSampling:   1.0,
+			OTELTimeout:     3 * time.Second,
 		},
 	}
 }

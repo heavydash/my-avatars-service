@@ -45,3 +45,8 @@ test-avatar.*
 .idea/
 *.iml
 .vscode/
+
+# Kubernetes Secrets — реальные значения не храним в репозитории
+k8s/base/secret.yaml
+k8s/**/secret.yaml
+!k8s/**/secret.yaml.example

@@ -42,8 +42,6 @@ var (
 	buildVersion = "dev"
 	buildDate    = "unknown"
 	buildCommit  = "unknown"
-
-	tracerProvider *sdktrace.TracerProvider
 )
 
 func main() {
@@ -61,8 +59,10 @@ func main() {
 	log := logger.NewLogger(&cfg.Observability)
 	defer log.Sync()
 
+	var tracerProvider *sdktrace.TracerProvider
+
 	// Tracing
-	tracerProvider, err = tracing.InitTracer(&cfg.Observability)
+	tracerProvider, err = tracing.InitTracer(&cfg.Observability, log)
 	if err != nil {
 		log.Error("Failed to initialize OpenTelemetry tracer", "error", err)
 	} else {
@@ -131,10 +131,10 @@ func main() {
 	)
 
 	// TestToken
-	authHandler := handler.NewAuthHandler(jwtService)
+	authHandler := handler.NewAuthHandler(jwtService, log)
 
 	// Handler
-	avatarHandler := handler.NewAvatarHandler(avatarService, service.JWTService{})
+	avatarHandler := handler.NewAvatarHandler(avatarService, log)
 
 	log.Info("All layers initialized successfully")
 

@@ -6,20 +6,20 @@ import (
 	"github.com/google/uuid"
 	"github.com/heavydash/my-avatars-service/internal/api/middleware"
 	"github.com/heavydash/my-avatars-service/internal/domain"
+	"github.com/heavydash/my-avatars-service/internal/pkg/logger"
 	"github.com/heavydash/my-avatars-service/internal/service"
-	"log"
 	"net/http"
 )
 
 type AvatarHandler struct {
-	jwtService service.JWTService
-	service    service.AvatarUseCase
+	service service.AvatarUseCase
+	log     logger.Logger
 }
 
-func NewAvatarHandler(svc service.AvatarUseCase, jwtService service.JWTService) *AvatarHandler {
+func NewAvatarHandler(svc service.AvatarUseCase, log logger.Logger) *AvatarHandler {
 	return &AvatarHandler{
-		service:    svc,
-		jwtService: jwtService,
+		service: svc,
+		log:     log,
 	}
 }
 
@@ -138,7 +138,7 @@ func (h *AvatarHandler) GetUserAvatars(c *gin.Context) {
 	// Получаем последнюю аватарку пользователя
 	avatars, err := h.service.GetByUserID(c.Request.Context(), userID)
 	if err != nil {
-		log.Printf("GetByUserID error: %v", err)
+		h.log.ErrorCtx(c.Request.Context(), "GetByUserID error", "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": domain.ErrInternal.Error()})
 		return
 	}

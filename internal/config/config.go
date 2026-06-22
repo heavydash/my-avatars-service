@@ -100,10 +100,6 @@ func newWithFlags(fs *flag.FlagSet) (*Config, error) {
 		return nil, fmt.Errorf("config validation failed: %w", err)
 	}
 
-	if err := cfg.Validate(); err != nil {
-		return nil, fmt.Errorf("config validation failed: %w", err)
-	}
-
 	log.Println(" Configuration loaded successfully")
 	return cfg, nil
 }

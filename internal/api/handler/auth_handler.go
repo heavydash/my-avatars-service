@@ -2,17 +2,20 @@ package handler
 
 import (
 	"github.com/gin-gonic/gin"
+	"github.com/heavydash/my-avatars-service/internal/pkg/logger"
 	"github.com/heavydash/my-avatars-service/internal/service"
 	"net/http"
 )
 
 type AuthHandler struct {
 	jwtService *service.JWTService
+	log        logger.Logger
 }
 
-func NewAuthHandler(jwtService *service.JWTService) *AuthHandler {
+func NewAuthHandler(jwtService *service.JWTService, log logger.Logger) *AuthHandler {
 	return &AuthHandler{
 		jwtService: jwtService,
+		log:        log,
 	}
 }
 
@@ -25,7 +28,12 @@ func (h *AuthHandler) TestToken(c *gin.Context) {
 
 	token, err := h.jwtService.GenerateToken(userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		h.log.Error("Failed to generate JWT token",
+			"user_id", userID,
+			"error", err,
+		)
+
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
 

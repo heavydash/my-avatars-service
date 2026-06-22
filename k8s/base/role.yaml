@@ -5,8 +5,9 @@ metadata:
   namespace: gophprofile
 rules:
   - apiGroups: [""]
-    resources: ["configmaps", "secrets"]
+    resources: ["configmaps"]
     verbs: ["get", "list", "watch"]
+
   - apiGroups: [""]
     resources: ["pods"]
     verbs: ["get", "list"]

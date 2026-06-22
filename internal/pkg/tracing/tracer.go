@@ -3,19 +3,19 @@ package tracing
 import (
 	"context"
 	"github.com/heavydash/my-avatars-service/internal/config"
+	"github.com/heavydash/my-avatars-service/internal/pkg/logger"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
-	"log"
 	"os"
 	"strings"
 	"time"
 )
 
 // InitTracer инициализирует OpenTelemetry tracer с экспортом в Jaeger
-func InitTracer(cfg *config.ObservabilityConfig) (*sdktrace.TracerProvider, error) {
+func InitTracer(cfg *config.ObservabilityConfig, log logger.Logger) (*sdktrace.TracerProvider, error) {
 
 	endpoint := cfg.OTELExporter
 	if endpoint == "" {
@@ -31,7 +31,7 @@ func InitTracer(cfg *config.ObservabilityConfig) (*sdktrace.TracerProvider, erro
 	}
 
 	if endpoint == "none" || endpoint == "" {
-		log.Println("OpenTelemetry tracing disabled")
+		log.Info("OpenTelemetry tracing disabled")
 		return nil, nil
 	}
 
@@ -50,7 +50,7 @@ func InitTracer(cfg *config.ObservabilityConfig) (*sdktrace.TracerProvider, erro
 		otlptracegrpc.WithEndpoint(endpoint),
 	)
 	if err != nil {
-		return nil, nil
+		return nil, err
 	}
 
 	serviceName := cfg.OTELServiceName

@@ -111,17 +111,14 @@ func (s *AvatarService) UploadAvatar(ctx context.Context, userID uuid.UUID, file
 			FileSize:    avatar.FileSize,
 			ContentType: avatar.ContentType,
 		}
-
 		if err := s.publisher.PublishAvatarUploaded(ctx, event); err != nil {
-			s.logger.WarnCtx(ctx, "Failed to publish upload event", "error", err, "avatar_id", avatar.ID)
-		} else {
-			s.logger.InfoCtx(ctx, "Avatar uploaded and event published",
-				"avatar_id", avatar.ID,
-				"user_id", userID,
-			)
+			s.logger.WarnCtx(ctx, "Failed to publish upload event", "error", err,
+				"avatar_id", avatar.ID)
 		}
 	}
-
+	s.logger.InfoCtx(ctx, "Avatar uploaded and event published successfully",
+		"avatar_id", avatar.ID,
+		"user_id", userID)
 	return avatar, nil
 }
 

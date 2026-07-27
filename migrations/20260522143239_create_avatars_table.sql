@@ -1,6 +1,6 @@
 -- +goose Up
 CREATE TABLE IF NOT EXISTS avatars (
-                                       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL,
     original_url TEXT NOT NULL,
     file_size BIGINT NOT NULL CHECK (file_size > 0),

@@ -24,7 +24,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	log := logger.NewLogger(cfg.Server.Env)
+	log := logger.NewLogger(&cfg.Observability)
 	defer log.Sync()
 
 	log.Info("Worker starting...")
@@ -38,12 +38,12 @@ func main() {
 	defer dbPool.Close()
 
 	// Подключение к RabbitMQ
-	rabbitMQ, err := events.NewRabbitMQ("amqp://guest:guest@localhost:5672/")
+	rabbitURL := cfg.RabbitMQ.URL
+	rabbitMQ, err := events.NewRabbitMQ(rabbitURL)
 	if err != nil {
 		log.Error("Failed to connect to RabbitMQ", "error", err)
 		os.Exit(1)
 	}
-	defer rabbitMQ.Close()
 
 	// Инициализация репозитория и MinIO для Worker
 	avatarRepo, err := repository.NewAvatarRepository(cfg, dbPool.Pool)

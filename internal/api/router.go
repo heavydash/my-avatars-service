@@ -7,7 +7,6 @@ import (
 	"github.com/heavydash/my-avatars-service/internal/pkg/logger"
 	"github.com/heavydash/my-avatars-service/internal/service"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
-	_ "go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 	"time"
 )
 
@@ -16,7 +15,9 @@ func NewRouter(
 	avatarHandler *handler.AvatarHandler,
 	authHandler *handler.AuthHandler,
 	jwtService *service.JWTService,
-	log logger.Logger) *gin.Engine {
+	log logger.Logger,
+	env string,
+) *gin.Engine {
 	r := gin.New()
 
 	// OpenTelemetry Tracing Middleware
@@ -24,7 +25,6 @@ func NewRouter(
 
 	// Глобальные Middleware
 	r.Use(gin.Recovery())
-
 	r.Use(middleware.PrometheusMiddleware())
 
 	// Кастомный structured logger
@@ -65,7 +65,9 @@ func NewRouter(
 			c.String(200, "GophProfile Avatar Service is running\n")
 		})
 
-		public.GET("/auth/test-token", authHandler.TestToken)
+		if env == "development" || env == "test" {
+			public.GET("/auth/test-token", authHandler.TestToken)
+		}
 
 		// Веб-интерфейс
 		r.GET("/web/upload", func(c *gin.Context) {
@@ -97,15 +99,6 @@ func NewRouter(
 
 		return r
 	}
-}
-
-// Маленькие хендлеры
-func healthCheck(c *gin.Context) {
-	c.JSON(200, gin.H{"status": "ok", "service": "gophprofile"})
-}
-
-func rootHandler(c *gin.Context) {
-	c.String(200, "GophProfile Avatar Service is running\n")
 }
 
 // securityHeadersMiddleware — middleware для security headers

@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/h2non/filetype"
@@ -16,6 +17,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 	"log/slog"
 	"mime/multipart"
+	"time"
 )
 
 // AvatarService — бизнес-логика работы с аватарками
@@ -24,6 +26,7 @@ type AvatarService struct {
 	storage   storage.Storage
 	publisher events.PublisherInterface
 	logger    logger.Logger
+	tracer    trace.Tracer
 }
 
 // NewAvatarService сервис добавления аватарок
@@ -33,14 +36,15 @@ func NewAvatarService(repo repository.AvatarRepository, storage storage.Storage,
 		storage:   storage,
 		publisher: publisher,
 		logger:    log,
+		tracer:    otel.Tracer("gophprofile.service"),
 	}
 }
 
 // UploadAvatar обрабатывает загрузку аватарки
 func (s *AvatarService) UploadAvatar(ctx context.Context, userID uuid.UUID, file multipart.File, header *multipart.FileHeader) (*domain.Avatar, error) {
-	//  Тестовая трассировка
-	tracer := otel.Tracer("gophprofile.service")
-	ctx, span := tracer.Start(ctx, "AvatarService.UploadAvatar", trace.WithAttributes(
+	start := time.Now()
+
+	ctx, span := s.tracer.Start(ctx, "AvatarService.UploadAvatar", trace.WithAttributes(
 		attribute.String("user_id", userID.String()),
 		attribute.Int64("file_size", header.Size)))
 	defer span.End()
@@ -57,7 +61,6 @@ func (s *AvatarService) UploadAvatar(ctx context.Context, userID uuid.UUID, file
 
 	// Разрешённые типы файлов
 	contentType := header.Header.Get("Content-Type")
-
 	// Magic bytes валидация
 	if err := validateFileType(file, contentType); err != nil {
 		s.logger.WarnCtx(ctx, "Unsupported file type", "content_type", contentType, "user_id", userID)
@@ -88,9 +91,13 @@ func (s *AvatarService) UploadAvatar(ctx context.Context, userID uuid.UUID, file
 	// Сохраняем метаданные в БД
 	if err := s.repo.Create(ctx, avatar); err != nil {
 		s.logger.ErrorCtx(ctx, "Failed to save avatar metadata", "error", err, "user_id", userID)
+		metrics.AvatarUploadsTotal.WithLabelValues("failed").Inc()
 		return nil, domain.ErrInternal
 	}
 
+	// Успешная загрузка
+	duration := time.Since(start).Seconds()
+	metrics.AvatarUploadDuration.Observe(duration)
 	metrics.AvatarUploadsTotal.WithLabelValues("success").Inc()
 	metrics.StorageUsageBytes.WithLabelValues(userID.String()).Add(float64(header.Size))
 	metrics.StorageObjectsTotal.Inc()
@@ -120,16 +127,14 @@ func (s *AvatarService) UploadAvatar(ctx context.Context, userID uuid.UUID, file
 
 // DeleteAvatar — удаление аватарки
 func (s *AvatarService) DeleteAvatar(ctx context.Context, id uuid.UUID) error {
-	// Тестовая трассировка
-	tracer := otel.Tracer("gophprofile.service")
-	ctx, span := tracer.Start(ctx, "AvatarService.DeleteAvatar", trace.WithAttributes(
+	ctx, span := s.tracer.Start(ctx, "AvatarService.DeleteAvatar", trace.WithAttributes(
 		attribute.String("avatar_id", id.String())))
 	defer span.End()
 
 	// Получаем аватарку, чтобы проверить существование и получить ключ для MinIO
 	avatar, err := s.repo.GetByID(ctx, id)
 	if err != nil {
-		if err == domain.ErrNotFound {
+		if errors.Is(err, domain.ErrNotFound) {
 			metrics.AvatarDeletesTotal.WithLabelValues("not_found").Inc()
 		} else {
 			metrics.AvatarDeletesTotal.WithLabelValues("failed").Inc()
@@ -151,7 +156,7 @@ func (s *AvatarService) DeleteAvatar(ctx context.Context, id uuid.UUID) error {
 		if err := s.publisher.PublishAvatarDeleted(ctx, event); err != nil {
 			s.logger.Warn("Failed to publish delete event",
 				slog.String("avatar_id", avatar.ID.String()),
-				err)
+				"error", err)
 		}
 	}
 

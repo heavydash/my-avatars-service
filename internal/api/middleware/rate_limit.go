@@ -3,6 +3,7 @@ package middleware
 import (
 	"fmt"
 	"github.com/gin-gonic/gin"
+	"github.com/heavydash/my-avatars-service/internal/pkg/metrics"
 	"sync"
 	"time"
 )
@@ -40,6 +41,13 @@ func (rl *RateLimiter) RateLimit() gin.HandlerFunc {
 
 		if len(valid) >= rl.limit {
 			retryAfter := rl.window - now.Sub(valid[0])
+
+			metrics.HTTPRequestsTotal.WithLabelValues(
+				c.Request.Method,
+				c.FullPath(),
+				"429",
+			).Inc()
+
 			c.Header("Retry-After", fmt.Sprintf("%.0f", retryAfter.Seconds()))
 
 			c.JSON(429, gin.H{

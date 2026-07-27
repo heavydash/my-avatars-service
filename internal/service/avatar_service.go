@@ -11,6 +11,9 @@ import (
 	"github.com/heavydash/my-avatars-service/internal/pkg/metrics"
 	"github.com/heavydash/my-avatars-service/internal/repository"
 	"github.com/heavydash/my-avatars-service/internal/storage"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	"log/slog"
 	"mime/multipart"
 )
@@ -35,6 +38,13 @@ func NewAvatarService(repo repository.AvatarRepository, storage storage.Storage,
 
 // UploadAvatar обрабатывает загрузку аватарки
 func (s *AvatarService) UploadAvatar(ctx context.Context, userID uuid.UUID, file multipart.File, header *multipart.FileHeader) (*domain.Avatar, error) {
+	//  Тестовая трассировка
+	tracer := otel.Tracer("gophprofile.service")
+	ctx, span := tracer.Start(ctx, "AvatarService.UploadAvatar", trace.WithAttributes(
+		attribute.String("user_id", userID.String()),
+		attribute.Int64("file_size", header.Size)))
+	defer span.End()
+
 	// Валидация user_id
 	if userID == uuid.Nil {
 		return nil, domain.ErrInvalidInput
@@ -110,6 +120,12 @@ func (s *AvatarService) UploadAvatar(ctx context.Context, userID uuid.UUID, file
 
 // DeleteAvatar — удаление аватарки
 func (s *AvatarService) DeleteAvatar(ctx context.Context, id uuid.UUID) error {
+	// Тестовая трассировка
+	tracer := otel.Tracer("gophprofile.service")
+	ctx, span := tracer.Start(ctx, "AvatarService.DeleteAvatar", trace.WithAttributes(
+		attribute.String("avatar_id", id.String())))
+	defer span.End()
+
 	// Получаем аватарку, чтобы проверить существование и получить ключ для MinIO
 	avatar, err := s.repo.GetByID(ctx, id)
 	if err != nil {

@@ -6,6 +6,8 @@ import (
 	"github.com/heavydash/my-avatars-service/internal/api/middleware"
 	"github.com/heavydash/my-avatars-service/internal/pkg/logger"
 	"github.com/heavydash/my-avatars-service/internal/service"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
+	_ "go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 	"time"
 )
 
@@ -16,6 +18,9 @@ func NewRouter(
 	jwtService *service.JWTService,
 	log logger.Logger) *gin.Engine {
 	r := gin.New()
+
+	// OpenTelemetry Tracing Middleware
+	r.Use(otelgin.Middleware("gophprofile"))
 
 	// Глобальные Middleware
 	r.Use(gin.Recovery())

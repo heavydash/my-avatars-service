@@ -1,0 +1,32 @@
+{
+  "title": "GophProfile - Avatars Service",
+  "tags": ["gophprofile"],
+  "panels": [
+    {
+      "title": "HTTP Requests Rate",
+      "type": "timeseries",
+      "targets": [{ "expr": "rate(http_requests_total[1m])", "legendFormat": "{{method}} {{path}}" }]
+    },
+    {
+      "title": "Error Rate (%)",
+      "type": "timeseries",
+      "targets": [{ "expr": "sum(rate(http_errors_total[1m])) / sum(rate(http_requests_total[1m])) * 100", "legendFormat": "Error Rate" }]
+    },
+    {
+      "title": "Latency (p95)",
+      "type": "timeseries",
+      "targets": [{ "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[1m])) by (le, path))", "legendFormat": "{{path}}" }]
+    },
+    {
+      "title": "Avatar Uploads",
+      "type": "timeseries",
+      "targets": [{ "expr": "avatar_uploads_total", "legendFormat": "{{status}}" }]
+    },
+    {
+      "title": "Storage Usage",
+      "type": "timeseries",
+      "targets": [{ "expr": "avatar_storage_bytes", "legendFormat": "User {{user_id}}" }]
+    }
+  ],
+  "time": { "from": "now-30m", "to": "now" }
+}

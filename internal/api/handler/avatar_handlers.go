@@ -4,30 +4,37 @@ import (
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/heavydash/my-avatars-service/internal/api/middleware"
 	"github.com/heavydash/my-avatars-service/internal/domain"
 	"github.com/heavydash/my-avatars-service/internal/service"
 	"net/http"
 )
 
 type AvatarHandler struct {
-	service service.AvatarUseCase
+	jwtService service.JWTService
+	service    service.AvatarUseCase
 }
 
-func NewAvatarHandler(svc service.AvatarUseCase) *AvatarHandler {
-	return &AvatarHandler{service: svc}
+func NewAvatarHandler(svc service.AvatarUseCase, jwtService service.JWTService) *AvatarHandler {
+	return &AvatarHandler{
+		service:    svc,
+		jwtService: jwtService,
+	}
 }
 
 // UploadAvatar — загрузка аватарки
 func (h *AvatarHandler) UploadAvatar(c *gin.Context) {
-	userIDStr := c.PostForm("user_id")
-	if userIDStr == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "user_id is required"})
+	// Берём user_id из JWT
+	userIDStr, exists := middleware.GetUserID(c)
+	if !exists || userIDStr == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "user_id is required (from JWT)"})
 		return
 	}
 
+	// Парсим string → uuid.UUID
 	userID, err := uuid.Parse(userIDStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user_id"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user_id in token"})
 		return
 	}
 

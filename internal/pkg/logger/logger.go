@@ -1,57 +1,103 @@
 package logger
 
 import (
-	"github.com/heavydash/my-avatars-service/internal/config"
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
+	"context"
+	"go.opentelemetry.io/otel/trace"
+	"log/slog"
+	"os"
 )
 
 // Logger — основной интерфейс логирования
 type Logger interface {
-	Debug(msg string, fields ...zap.Field)
-	Info(msg string, fields ...zap.Field)
-	Warn(msg string, fields ...zap.Field)
-	Error(msg string, fields ...zap.Field)
-	Fatal(msg string, fields ...zap.Field)
-	With(fields ...zap.Field) Logger
+	Debug(msg string, args ...any)
+	Info(msg string, args ...any)
+	Warn(msg string, args ...any)
+	Error(msg string, args ...any)
+
+	InfoCtx(ctx context.Context, msg string, args ...any)
+	ErrorCtx(ctx context.Context, msg string, args ...any)
+	WarnCtx(ctx context.Context, msg string, args ...any)
+
 	Sync() error
 }
 
-// ZapLogger — реализация на базе zap
-type ZapLogger struct {
-	logger *zap.Logger
+// slogLogger — реализация на базе slog
+type slogLogger struct {
+	*slog.Logger
 }
 
-// New создаёт логгер в зависимости от окружения
-func New(cfg *config.Config) (Logger, error) {
-	var zapCfg zap.Config
+// NewLogger создаёт логгер в зависимости от окружения
+func NewLogger(env string) Logger {
+	var handler slog.Handler
 
-	if cfg.Server.Debug {
-		zapCfg = zap.NewDevelopmentConfig()
-		zapCfg.EncoderConfig.TimeKey = "timestamp"
-		zapCfg.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
+	opts := &slog.HandlerOptions{
+		Level:     parseLevel(env),
+		AddSource: env == "development",
+	}
+
+	if env == "development" {
+		handler = slog.NewTextHandler(os.Stdout, opts)
 	} else {
-		zapCfg = zap.NewProductionConfig()
+		handler = slog.NewJSONHandler(os.Stdout, opts)
 	}
 
-	zapLogger, err := zapCfg.Build()
-	if err != nil {
-		return nil, err
+	return &slogLogger{
+		Logger: slog.New(handler),
 	}
-
-	return &ZapLogger{logger: zapLogger}, nil
 }
 
-func (l *ZapLogger) Debug(msg string, fields ...zap.Field) { l.logger.Debug(msg, fields...) }
-func (l *ZapLogger) Info(msg string, fields ...zap.Field)  { l.logger.Info(msg, fields...) }
-func (l *ZapLogger) Warn(msg string, fields ...zap.Field)  { l.logger.Warn(msg, fields...) }
-func (l *ZapLogger) Error(msg string, fields ...zap.Field) { l.logger.Error(msg, fields...) }
-func (l *ZapLogger) Fatal(msg string, fields ...zap.Field) { l.logger.Fatal(msg, fields...) }
-
-func (l *ZapLogger) With(fields ...zap.Field) Logger {
-	return &ZapLogger{logger: l.logger.With(fields...)}
+func parseLevel(env string) slog.Level {
+	switch env {
+	case "debug":
+		return slog.LevelDebug
+	case "warn":
+		return slog.LevelWarn
+	case "error":
+		return slog.LevelError
+	default:
+		return slog.LevelInfo
+	}
 }
 
-func (l *ZapLogger) Sync() error {
-	return l.logger.Sync()
+// WithTrace — добавляет trace_id и span_id из контекста
+func (l *slogLogger) WithTrace(ctx context.Context) *slog.Logger {
+	if span := trace.SpanFromContext(ctx); span.SpanContext().IsValid() {
+		return l.Logger.With(
+			slog.String("trace_id", span.SpanContext().TraceID().String()),
+			slog.String("span_id", span.SpanContext().SpanID().String()),
+		)
+	}
+	return l.Logger
+}
+
+func (l *slogLogger) InfoCtx(ctx context.Context, msg string, args ...any) {
+	l.WithTrace(ctx).Info(msg, args...)
+}
+
+func (l *slogLogger) ErrorCtx(ctx context.Context, msg string, args ...any) {
+	l.WithTrace(ctx).Error(msg, args...)
+}
+
+func (l *slogLogger) WarnCtx(ctx context.Context, msg string, args ...any) {
+	l.WithTrace(ctx).Warn(msg, args...)
+}
+
+func (l *slogLogger) Info(msg string, args ...any) {
+	l.Logger.Info(msg, args...)
+}
+
+func (l *slogLogger) Error(msg string, args ...any) {
+	l.Logger.Error(msg, args...)
+}
+
+func (l *slogLogger) Debug(msg string, args ...any) {
+	l.Logger.Debug(msg, args...)
+}
+
+func (l *slogLogger) Warn(msg string, args ...any) {
+	l.Logger.Warn(msg, args...)
+}
+
+func (l *slogLogger) Sync() error {
+	return nil
 }

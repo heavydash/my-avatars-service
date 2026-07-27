@@ -14,10 +14,12 @@ import (
 
 // Config — корневая структура конфигурации
 type Config struct {
-	Server   ServerConfig   `json:"server"`
-	DB       DBConfig       `json:"db"`
-	MinIO    MinIOConfig    `json:"minio"`
-	RabbitMQ RabbitMQConfig `json:"rabbitmq"`
+	Server        ServerConfig        `json:"server"`
+	DB            DBConfig            `json:"db"`
+	MinIO         MinIOConfig         `json:"minio"`
+	RabbitMQ      RabbitMQConfig      `json:"rabbitmq"`
+	JWT           JWTConfig           `json:"jwt"`
+	Observability ObservabilityConfig `json:"observability"`
 }
 
 type ServerConfig struct {
@@ -50,6 +52,21 @@ type MinIOConfig struct {
 
 type RabbitMQConfig struct {
 	URL string `json:"URL"`
+}
+
+type JWTConfig struct {
+	Secret    string        `json:"secret"`
+	AccessTTL time.Duration `json:"access_ttl"`
+	Issuer    string        `json:"issuer"`
+}
+
+type ObservabilityConfig struct {
+	Environment     string  `json:"environment"`
+	LogLevel        string  `json:"log_level"`
+	MetricsPath     string  `json:"metrics_path"`
+	OTELServiceName string  `json:"otel_service_name"`
+	OTELExporter    string  `json:"otel_exporter_otlp"`
+	TraceSampling   float64 `json:"trace_sampling_ratio"`
 }
 
 // New — основная функция загрузки конфигурации
@@ -114,6 +131,19 @@ func defaultConfig() *Config {
 		RabbitMQ: RabbitMQConfig{
 			URL: "amqp://guest:guest@localhost:5672/",
 		},
+		JWT: JWTConfig{
+			Secret:    "secret",
+			AccessTTL: 24 * time.Hour,
+			Issuer:    "goph",
+		},
+		Observability: ObservabilityConfig{
+			Environment:     "development",
+			LogLevel:        "info",
+			MetricsPath:     "/metrics",
+			OTELServiceName: "gophprofile",
+			OTELExporter:    "http://jaeger:4317",
+			TraceSampling:   1.0,
+		},
 	}
 }
 
@@ -163,6 +193,34 @@ func overwriteFromEnv(cfg *Config) {
 	if v := os.Getenv("RABBITMQ_URL"); v != "" {
 		cfg.RabbitMQ.URL = v
 	}
+	//JWT
+	if v := os.Getenv("JWT_SECRET"); v != "" {
+		cfg.JWT.Secret = v
+	}
+	if v := os.Getenv("JWT_ACCESS_TTL"); v != "" {
+		if d, err := time.ParseDuration(v); err == nil {
+			cfg.JWT.AccessTTL = d
+		}
+	}
+	if v := os.Getenv("JWT_ISSUER"); v != "" {
+		cfg.JWT.Issuer = v
+	}
+	// Observability
+	if v := os.Getenv("OBSERVABILITY_ENV"); v != "" {
+		cfg.Observability.Environment = v
+	}
+	if v := os.Getenv("LOG_LEVEL"); v != "" {
+		cfg.Observability.LogLevel = v
+	}
+	if v := os.Getenv("METRICS_PATH"); v != "" {
+		cfg.Observability.MetricsPath = v
+	}
+	if v := os.Getenv("OTEL_SERVICE_NAME"); v != "" {
+		cfg.Observability.OTELServiceName = v
+	}
+	if v := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT"); v != "" {
+		cfg.Observability.OTELExporter = v
+	}
 }
 
 func (c *Config) Validate() error {
@@ -177,6 +235,9 @@ func (c *Config) Validate() error {
 	}
 	if c.RabbitMQ.URL == "" {
 		return fmt.Errorf("rabbitmq url is required")
+	}
+	if c.JWT.Secret == "" || len(c.JWT.Secret) < 32 {
+		return fmt.Errorf("jwt secret must be at least 32 characters")
 	}
 	return nil
 }

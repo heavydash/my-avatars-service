@@ -8,9 +8,10 @@ import (
 	"github.com/heavydash/my-avatars-service/internal/domain"
 	"github.com/heavydash/my-avatars-service/internal/events"
 	"github.com/heavydash/my-avatars-service/internal/pkg/logger"
+	"github.com/heavydash/my-avatars-service/internal/pkg/metrics"
 	"github.com/heavydash/my-avatars-service/internal/repository"
 	"github.com/heavydash/my-avatars-service/internal/storage"
-	"go.uber.org/zap"
+	"log/slog"
 	"mime/multipart"
 )
 
@@ -40,6 +41,7 @@ func (s *AvatarService) UploadAvatar(ctx context.Context, userID uuid.UUID, file
 	}
 	// Валидация размера
 	if header.Size > 10*1024*1024 { // 10MB
+		s.logger.WarnCtx(ctx, "File too large", "size", header.Size, "user_id", userID)
 		return nil, domain.ErrFileTooLarge
 	}
 
@@ -48,17 +50,25 @@ func (s *AvatarService) UploadAvatar(ctx context.Context, userID uuid.UUID, file
 
 	// Magic bytes валидация
 	if err := validateFileType(file, contentType); err != nil {
+		s.logger.WarnCtx(ctx, "Unsupported file type", "content_type", contentType, "user_id", userID)
 		return nil, err
 	}
 
 	// Создаём доменную сущность
 	avatar := domain.NewAvatar(userID, "", header.Size, contentType)
 
+	s.logger.InfoCtx(ctx, "Starting avatar upload",
+		"user_id", userID,
+		"file_size", header.Size,
+		"content_type", contentType,
+	)
+
 	// Сохраняем файл в MinIO
 	url, err := s.storage.Save(ctx, avatar.ID.String(), file, header)
 	if err != nil {
 		avatar.MarkAsFailed(err.Error())
 		_ = s.repo.Create(ctx, avatar)
+		s.logger.ErrorCtx(ctx, "Failed to save file to storage", "error", err, "user_id", userID)
 		return nil, fmt.Errorf("%w: %w", domain.ErrUploadFailed, err)
 	}
 
@@ -67,8 +77,13 @@ func (s *AvatarService) UploadAvatar(ctx context.Context, userID uuid.UUID, file
 
 	// Сохраняем метаданные в БД
 	if err := s.repo.Create(ctx, avatar); err != nil {
+		s.logger.ErrorCtx(ctx, "Failed to save avatar metadata", "error", err, "user_id", userID)
 		return nil, domain.ErrInternal
 	}
+
+	metrics.AvatarUploadsTotal.WithLabelValues("success").Inc()
+	metrics.StorageUsageBytes.WithLabelValues(userID.String()).Add(float64(header.Size))
+	metrics.StorageObjectsTotal.Inc()
 
 	// Публикуем событие для асинхронной обработки
 	if s.publisher != nil {
@@ -81,14 +96,12 @@ func (s *AvatarService) UploadAvatar(ctx context.Context, userID uuid.UUID, file
 		}
 
 		if err := s.publisher.PublishAvatarUploaded(ctx, event); err != nil {
-			// Пока только warning, не падаем — загрузка уже прошла успешно
-			s.logger.Warn("failed to publish upload event: %v\n",
-				zap.String("avatar_id", avatar.ID.String()),
-				zap.Error(err))
+			s.logger.WarnCtx(ctx, "Failed to publish upload event", "error", err, "avatar_id", avatar.ID)
 		} else {
-			s.logger.Info("Event published successfully",
-				zap.String("avatar_id", avatar.ID.String()),
-				zap.String("user_id", avatar.UserID.String()))
+			s.logger.InfoCtx(ctx, "Avatar uploaded and event published",
+				"avatar_id", avatar.ID,
+				"user_id", userID,
+			)
 		}
 	}
 
@@ -100,8 +113,18 @@ func (s *AvatarService) DeleteAvatar(ctx context.Context, id uuid.UUID) error {
 	// Получаем аватарку, чтобы проверить существование и получить ключ для MinIO
 	avatar, err := s.repo.GetByID(ctx, id)
 	if err != nil {
+		if err == domain.ErrNotFound {
+			metrics.AvatarDeletesTotal.WithLabelValues("not_found").Inc()
+		} else {
+			metrics.AvatarDeletesTotal.WithLabelValues("failed").Inc()
+		}
 		return err
 	}
+
+	s.logger.InfoCtx(ctx, "Starting avatar deletion",
+		"avatar_id", avatar.ID,
+		"user_id", avatar.UserID,
+	)
 
 	// Публикуем событие для асинхронного удаления файлов из MinIO
 	if s.publisher != nil {
@@ -111,13 +134,28 @@ func (s *AvatarService) DeleteAvatar(ctx context.Context, id uuid.UUID) error {
 		}
 		if err := s.publisher.PublishAvatarDeleted(ctx, event); err != nil {
 			s.logger.Warn("Failed to publish delete event",
-				zap.String("avatar_id", avatar.ID.String()),
-				zap.Error(err))
+				slog.String("avatar_id", avatar.ID.String()),
+				err)
 		}
 	}
 
 	// Удаляем метаданные из БД
-	return s.repo.Delete(ctx, id)
+	if err := s.repo.Delete(ctx, id); err != nil {
+		metrics.AvatarDeletesTotal.WithLabelValues("failed").Inc()
+		s.logger.ErrorCtx(ctx, "Failed to delete avatar from database", "error", err, "avatar_id", avatar.ID)
+		return err
+	}
+
+	metrics.AvatarDeletesTotal.WithLabelValues("success").Inc()
+	metrics.StorageUsageBytes.WithLabelValues(avatar.UserID.String()).Sub(float64(avatar.FileSize))
+	metrics.StorageObjectsTotal.Dec()
+
+	s.logger.InfoCtx(ctx, "Avatar deleted successfully",
+		"avatar_id", avatar.ID,
+		"user_id", avatar.UserID,
+	)
+
+	return nil
 }
 
 // GetByID — получение аватарки по ID

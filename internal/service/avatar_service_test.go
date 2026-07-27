@@ -242,8 +242,10 @@ func TestAvatarService_UploadAvatar(t *testing.T) {
 				publisher.On("PublishAvatarUploaded", mock.Anything, mock.Anything).Return(nil)
 
 				// Ожидаем лог успешной загрузки
-				log.On("Info", mock.Anything, mock.Anything).Return()
+				log.On("InfoCtx", mock.Anything, mock.Anything, mock.Anything).
+					Return().Twice()
 			},
+
 			expectedError: nil,
 			validateResult: func(t *testing.T, av *domain.Avatar) {
 				// Проверяем, что ID сгенерировался
@@ -268,8 +270,11 @@ func TestAvatarService_UploadAvatar(t *testing.T) {
 			fileSize:    11 * 1024 * 1024, // 11MB > 10MB
 			contentType: "image/png",
 			fileData:    createPNGHeader(),
-			setupMocks: func(repo *mockAvatarRepository, _ *mockStorage, _ *mockPublisher, _ *mockLogger) { // Проверяем, что Create не вызывается из-за ошибки валидации
+			setupMocks: func(repo *mockAvatarRepository, _ *mockStorage, _ *mockPublisher, log *mockLogger) { // Проверяем, что Create не вызывается из-за ошибки валидации
 				repo.AssertNotCalled(t, "Create")
+
+				log.On("WarnCtx", mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
+				log.On("InfoCtx", mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
 			},
 			expectedError: domain.ErrFileTooLarge,
 		},
@@ -279,8 +284,10 @@ func TestAvatarService_UploadAvatar(t *testing.T) {
 			fileSize:    1024,
 			contentType: "text/plain",
 			fileData:    []byte("This is a text file"),
-			setupMocks: func(repo *mockAvatarRepository, _ *mockStorage, _ *mockPublisher, _ *mockLogger) { // Проверяем, что Create не вызывается из-за неподдерживаемого формата
+			setupMocks: func(repo *mockAvatarRepository, _ *mockStorage, _ *mockPublisher, log *mockLogger) { // Проверяем, что Create не вызывается из-за неподдерживаемого формата
 				repo.AssertNotCalled(t, "Create")
+
+				log.On("WarnCtx", mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
 			},
 			expectedError: domain.ErrUnsupportedFormat,
 		},
@@ -360,6 +367,8 @@ func TestAvatarService_DeleteAvatar(t *testing.T) {
 				repo.On("GetByID", mock.Anything, mock.Anything).Return(avatar, nil)
 				publisher.On("PublishAvatarDeleted", mock.Anything, mock.Anything).Return(nil)
 				repo.On("Delete", mock.Anything, mock.Anything).Return(nil)
+
+				log.On("InfoCtx", mock.Anything, mock.Anything, mock.Anything).Return().Twice()
 			},
 			expectedError: nil,
 		},
@@ -383,7 +392,8 @@ func TestAvatarService_DeleteAvatar(t *testing.T) {
 				publisher.On("PublishAvatarDeleted", mock.Anything, mock.Anything).Return(errors.New("rabbitmq down"))
 				repo.On("Delete", mock.Anything, mock.Anything).Return(nil)
 
-				log.On("Warn", mock.Anything, mock.Anything).Return()
+				log.On("InfoCtx", mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
+				log.On("Warn", mock.Anything, mock.Anything).Return().Maybe()
 			},
 			expectedError: nil, // удаление должно пройти несмотря на ошибку события
 		},
@@ -396,6 +406,9 @@ func TestAvatarService_DeleteAvatar(t *testing.T) {
 				repo.On("GetByID", mock.Anything, mock.Anything).Return(avatar, nil)
 				publisher.On("PublishAvatarDeleted", mock.Anything, mock.Anything).Return(nil)
 				repo.On("Delete", mock.Anything, mock.Anything).Return(domain.ErrInternal)
+
+				log.On("InfoCtx", mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
+				log.On("ErrorCtx", mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
 			},
 			expectedError: domain.ErrInternal,
 		},

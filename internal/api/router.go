@@ -6,6 +6,8 @@ import (
 	"github.com/heavydash/my-avatars-service/internal/api/middleware"
 	"github.com/heavydash/my-avatars-service/internal/pkg/logger"
 	"github.com/heavydash/my-avatars-service/internal/service"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 	"time"
 )
@@ -96,9 +98,13 @@ func NewRouter(
 			v1.GET("/users/:user_id/avatar", avatarHandler.GetUserAvatar)
 
 		}
-
-		return r
 	}
+
+	r.GET("/swagger/*any",
+		ginSwagger.WrapHandler(swaggerFiles.Handler,
+			ginSwagger.URL("/swagger/doc.json")))
+
+	return r
 }
 
 // securityHeadersMiddleware — middleware для security headers

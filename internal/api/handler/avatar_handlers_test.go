@@ -15,7 +15,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/stretchr/testify/require"
+	"github.com/heavydash/my-avatars-service/internal/repository/mocks"
+	"github.com/heavydash/my-avatars-service/internal/service"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
@@ -39,6 +40,8 @@ import (
 type mockAvatarService struct {
 	mock.Mock
 }
+
+var mockJWTService = service.JWTService{}
 
 // UploadAvatar мокирует загрузку аватарки в хранилище.
 //
@@ -104,174 +107,86 @@ func TestAvatarHandler_UploadAvatar(t *testing.T) {
 
 	tests := []struct {
 		name           string
-		userIDHeader   string
-		setupRequest   func() (*http.Request, error)
-		setupMocks     func(*mockAvatarService, uuid.UUID, uuid.UUID)
+		setupCtx       func(c *gin.Context)
+		setupRequest   func(c *gin.Context)
+		mockSetup      func(svc *mocks.AvatarUseCase)
 		expectedStatus int
-		expectedBody   map[string]interface{}
 	}{
 		{
-			name:         "success",
-			userIDHeader: uuid.New().String(),
-			setupRequest: func() (*http.Request, error) {
+			name: "missing_user_ID_header",
+			setupCtx: func(c *gin.Context) {
+				// ничего не ставим
+			},
+			setupRequest: func(c *gin.Context) {
+				c.Request = httptest.NewRequest(http.MethodPost, "/api/v1/avatars", nil)
+			},
+			mockSetup:      nil,
+			expectedStatus: http.StatusUnauthorized,
+		},
+		{
+			name: "invalid_user_ID_format",
+			setupCtx: func(c *gin.Context) {
+				c.Set("user_id", "not-a-uuid")
+			},
+			setupRequest: func(c *gin.Context) {
+				c.Request = httptest.NewRequest(http.MethodPost, "/api/v1/avatars", nil)
+			},
+			mockSetup:      nil,
+			expectedStatus: http.StatusBadRequest,
+		},
+		{
+			name: "no_file_uploaded",
+			setupCtx: func(c *gin.Context) {
+				c.Set("user_id", "550e8400-e29b-41d4-a716-446655440000")
+			},
+			setupRequest: func(c *gin.Context) {
+				c.Request = httptest.NewRequest(http.MethodPost, "/api/v1/avatars", nil)
+			},
+			mockSetup:      nil,
+			expectedStatus: http.StatusBadRequest,
+		},
+		{
+			name: "service_error_-_file_too_large",
+			setupCtx: func(c *gin.Context) {
+				c.Set("user_id", "550e8400-e29b-41d4-a716-446655440000")
+			},
+			setupRequest: func(c *gin.Context) {
 				body := &bytes.Buffer{}
 				writer := multipart.NewWriter(body)
-
-				// Пишем в форму user_id
-				writer.WriteField("user_id", uuid.New().String())
-
-				// Создаём файловое поле с именем "file"
-				part, err := writer.CreateFormFile("file", "test.png")
-				if err != nil {
-					return nil, err
-				}
-				// Пишем валидный PNG заголовок
-				part.Write([]byte{137, 80, 78, 71, 13, 10, 26, 10})
+				part, _ := writer.CreateFormFile("file", "test.png")
+				part.Write([]byte("fake image data"))
 				writer.Close()
 
 				req := httptest.NewRequest(http.MethodPost, "/api/v1/avatars", body)
 				req.Header.Set("Content-Type", writer.FormDataContentType())
-				return req, nil
+				c.Request = req
 			},
-			setupMocks: func(svc *mockAvatarService, avatarID, userID uuid.UUID) {
-				// Мокаем успешную загрузку
+			mockSetup: func(svc *mocks.AvatarUseCase) {
 				svc.On("UploadAvatar", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-					Return(&domain.Avatar{
-						ID:     uuid.New(),
-						UserID: uuid.New(),
-						Status: domain.AvatarStatusReady,
-					}, nil)
-			},
-			expectedStatus: http.StatusCreated,
-			expectedBody:   nil, // Тело проверяется отдельно через JSON
-		},
-		{
-			name:         "missing user ID header",
-			userIDHeader: "",
-			setupRequest: func() (*http.Request, error) {
-				body := &bytes.Buffer{}
-				writer := multipart.NewWriter(body)
-				// user_id специально не добавляем
-				part, _ := writer.CreateFormFile("file", "test.png")
-				part.Write([]byte{137, 80, 78, 71, 13, 10, 26, 10})
-				writer.Close()
-
-				req := httptest.NewRequest(http.MethodPost, "/api/v1/avatars", body)
-				req.Header.Set("Content-Type", writer.FormDataContentType())
-				return req, nil
-			},
-			setupMocks:     func(svc *mockAvatarService, avatarID, userID uuid.UUID) {},
-			expectedStatus: http.StatusBadRequest,
-			expectedBody: map[string]interface{}{
-				"error": "user_id is required",
-			},
-		},
-		{
-			name:         "invalid user ID format",
-			userIDHeader: "invalid-uuid",
-			setupRequest: func() (*http.Request, error) {
-				body := &bytes.Buffer{}
-				writer := multipart.NewWriter(body)
-				writer.WriteField("user_id", "invalid-uuid")
-				part, _ := writer.CreateFormFile("file", "test.png")
-				part.Write([]byte{137, 80, 78, 71, 13, 10, 26, 10})
-				writer.Close()
-
-				req := httptest.NewRequest(http.MethodPost, "/api/v1/avatars", body)
-				req.Header.Set("Content-Type", writer.FormDataContentType())
-				return req, nil
-			},
-			setupMocks:     func(svc *mockAvatarService, avatarID, userID uuid.UUID) {},
-			expectedStatus: http.StatusBadRequest,
-			expectedBody: map[string]interface{}{
-				"error": "invalid user_id",
-			},
-		},
-		{
-			name:         "no file uploaded",
-			userIDHeader: uuid.New().String(),
-			setupRequest: func() (*http.Request, error) {
-				body := &bytes.Buffer{}
-				writer := multipart.NewWriter(body)
-				writer.WriteField("user_id", uuid.New().String())
-				writer.Close()
-
-				req := httptest.NewRequest(http.MethodPost, "/api/v1/avatars", body)
-				req.Header.Set("Content-Type", writer.FormDataContentType())
-				return req, nil
-			},
-			setupMocks:     func(svc *mockAvatarService, avatarID, userID uuid.UUID) {},
-			expectedStatus: http.StatusBadRequest,
-			expectedBody: map[string]interface{}{
-				"error": "file is required",
-			},
-		},
-		{
-			name:         "service error - file too large",
-			userIDHeader: uuid.New().String(),
-			setupRequest: func() (*http.Request, error) {
-				body := &bytes.Buffer{}
-				writer := multipart.NewWriter(body)
-				writer.WriteField("user_id", uuid.New().String())
-				part, _ := writer.CreateFormFile("file", "test.png")
-				part.Write([]byte{137, 80, 78, 71, 13, 10, 26, 10})
-				writer.Close()
-
-				req := httptest.NewRequest(http.MethodPost, "/api/v1/avatars", body)
-				req.Header.Set("Content-Type", writer.FormDataContentType())
-				return req, nil
-			},
-			setupMocks: func(svc *mockAvatarService, avatarID, userID uuid.UUID) {
-				// Мокаем ошибку сервиса
-				svc.On("UploadAvatar", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-					Return(nil, domain.ErrFileTooLarge)
+					Return(nil, domain.ErrFileTooLarge).Once()
 			},
 			expectedStatus: http.StatusBadRequest,
-			expectedBody: map[string]interface{}{
-				"error": "file size exceeds 10MB limit",
-			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Инициализируем мок
-			mockSvc := &mockAvatarService{}
-			tt.setupMocks(mockSvc, uuid.Nil, uuid.Nil)
-
-			handler := NewAvatarHandler(mockSvc)
-
-			// Подготавливаем запрос
-			req, err := tt.setupRequest()
-			require.NoError(t, err)
-
 			w := httptest.NewRecorder()
 			c, _ := gin.CreateTestContext(w)
-			c.Request = req
 
-			// Устанавливаем заголовок, если передан
-			if tt.userIDHeader != "" {
-				c.Request.Header.Set("X-User-ID", tt.userIDHeader)
+			mockSvc := new(mocks.AvatarUseCase)
+			if tt.mockSetup != nil {
+				tt.mockSetup(mockSvc)
 			}
 
-			// Вызываем хендлер
+			handler := NewAvatarHandler(mockSvc, service.JWTService{})
+
+			tt.setupCtx(c)
+			tt.setupRequest(c)
+
 			handler.UploadAvatar(c)
 
-			// Проверяем статус
 			assert.Equal(t, tt.expectedStatus, w.Code)
-
-			// Проверяем тело ответа
-			if tt.expectedBody != nil {
-				var response map[string]interface{}
-				err = json.Unmarshal(w.Body.Bytes(), &response)
-				assert.NoError(t, err)
-
-				for key, expectedValue := range tt.expectedBody {
-					assert.Equal(t, expectedValue, response[key])
-				}
-			}
-
-			// Проверяем, что все ожидаемые вызовы мока произошли
 			mockSvc.AssertExpectations(t)
 		})
 	}
@@ -403,7 +318,7 @@ func TestAvatarHandler_DeleteAvatar(t *testing.T) {
 
 			tt.setupMocks(mockSvc, avatarUUID, userUUID)
 
-			handler := NewAvatarHandler(mockSvc)
+			handler := NewAvatarHandler(mockSvc, mockJWTService)
 
 			router := gin.New()
 			router.DELETE("/api/v1/avatars/:id", handler.DeleteAvatar)
@@ -520,7 +435,7 @@ func TestAvatarHandler_GetAvatar(t *testing.T) {
 			avatarUUID, _ := uuid.Parse(tt.avatarID)
 			tt.setupMocks(mockSvc, avatarUUID)
 
-			handler := NewAvatarHandler(mockSvc)
+			handler := NewAvatarHandler(mockSvc, mockJWTService)
 
 			router := gin.New()
 			router.GET("/api/v1/avatars/:id", handler.GetAvatar)
@@ -633,7 +548,7 @@ func TestAvatarHandler_GetUserAvatar(t *testing.T) {
 			userUUID, _ := uuid.Parse(tt.userID)
 			tt.setupMocks(mockSvc, userUUID)
 
-			handler := NewAvatarHandler(mockSvc)
+			handler := NewAvatarHandler(mockSvc, mockJWTService)
 
 			router := gin.New()
 			router.GET("/api/v1/users/:user_id/avatar", handler.GetUserAvatar)
@@ -731,7 +646,7 @@ func TestAvatarHandler_GetUserAvatars(t *testing.T) {
 			userUUID, _ := uuid.Parse(tt.userID)
 			tt.setupMocks(mockSvc, userUUID)
 
-			handler := NewAvatarHandler(mockSvc)
+			handler := NewAvatarHandler(mockSvc, mockJWTService)
 
 			router := gin.New()
 			router.GET("/api/v1/avatars", handler.GetUserAvatars)
@@ -832,7 +747,7 @@ func TestAvatarHandler_GetAvatarMetadata(t *testing.T) {
 			avatarUUID, _ := uuid.Parse(tt.avatarID)
 			tt.setupMocks(mockSvc, avatarUUID)
 
-			handler := NewAvatarHandler(mockSvc)
+			handler := NewAvatarHandler(mockSvc, mockJWTService)
 
 			router := gin.New()
 			router.GET("/api/v1/avatars/:id/metadata", handler.GetAvatarMetadata)

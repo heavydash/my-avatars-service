@@ -3,12 +3,18 @@ FROM golang:1.25-alpine AS builder
 
 WORKDIR /app
 
+# Устанавливаем build-base, чтобы swag init не ругался на CGO
+RUN apk add --no-cache build-base
+
 # Копия зависимостей
 COPY go.mod go.sum ./
 RUN go mod download
 
 # Копируем исходники
 COPY . .
+
+
+RUN go install github.com/pressly/goose/v3/cmd/goose@v3.21.1
 
 # Собираем два бинарника
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o /server ./cmd/server
@@ -26,9 +32,13 @@ WORKDIR /home/appuser
 COPY --from=builder /server /server
 COPY --from=builder /worker /worker
 
+# Копируем goose
+COPY --from=builder /go/bin/goose /usr/local/bin/goose
 
-# Копируем фронтенд
+# Копируем фронтенд и swagger docs
 COPY --from=builder /app/web ./web
+COPY --from=builder /app/docs ./docs
+COPY --from=builder /app/migrations ./migrations
 
 USER appuser
 

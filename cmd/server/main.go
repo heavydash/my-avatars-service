@@ -1,9 +1,25 @@
+// @title GophProfile API
+// @version 1.0
+// @description API для управления аватарками пользователей
+// @termsOfService http://swagger.io/terms/
+
+// @contact.name API Support
+// @contact.url http://www.swagger.io/support
+// @contact.email support@swagger.io
+
+// @license.name Apache 2.0
+// @license.url http://www.apache.org/licenses/LICENSE-2.0.html
+
+// @host localhost:8085
+// @BasePath /
+// @schemes http
 package main
 
 import (
 	"context"
 	"fmt"
 	"github.com/gin-gonic/gin"
+	_ "github.com/heavydash/my-avatars-service/docs"
 	"github.com/heavydash/my-avatars-service/internal/api"
 	"github.com/heavydash/my-avatars-service/internal/api/handler"
 	"github.com/heavydash/my-avatars-service/internal/config"
@@ -26,8 +42,6 @@ var (
 	buildVersion = "dev"
 	buildDate    = "unknown"
 	buildCommit  = "unknown"
-
-	tracerProvider *sdktrace.TracerProvider
 )
 
 func main() {
@@ -45,8 +59,10 @@ func main() {
 	log := logger.NewLogger(&cfg.Observability)
 	defer log.Sync()
 
+	var tracerProvider *sdktrace.TracerProvider
+
 	// Tracing
-	tracerProvider, err = tracing.InitTracer(&cfg.Observability)
+	tracerProvider, err = tracing.InitTracer(&cfg.Observability, log)
 	if err != nil {
 		log.Error("Failed to initialize OpenTelemetry tracer", "error", err)
 	} else {
@@ -115,10 +131,10 @@ func main() {
 	)
 
 	// TestToken
-	authHandler := handler.NewAuthHandler(jwtService)
+	authHandler := handler.NewAuthHandler(jwtService, log)
 
 	// Handler
-	avatarHandler := handler.NewAvatarHandler(avatarService, service.JWTService{})
+	avatarHandler := handler.NewAvatarHandler(avatarService, log)
 
 	log.Info("All layers initialized successfully")
 
@@ -140,6 +156,10 @@ func main() {
 	// Запуск сервера в горутине
 	go func() {
 		log.Info("HTTP server starting", "address", srv.Addr)
+		log.Info("Swagger documentation available",
+			"url", fmt.Sprintf("http://%s/swagger/index.html", cfg.Server.Addr()),
+		)
+
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Error("Server failed", "error", err)
 			os.Exit(1)

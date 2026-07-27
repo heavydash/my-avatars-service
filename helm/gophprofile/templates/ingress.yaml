@@ -1,0 +1,21 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "gophprofile.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "gophprofile.labels" . | nindent 4 }}
+  annotations:
+    {{- toYaml .Values.ingress.annotations | nindent 4 }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "gophprofile.fullname" . }}
+                port:
+                  number: {{ .Values.service.port }}

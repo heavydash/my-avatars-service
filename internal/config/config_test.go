@@ -41,6 +41,8 @@ func TestConfig_New(t *testing.T) {
 		assert.Equal(t, "localhost:9000", cfg.MinIO.Endpoint)
 		assert.Equal(t, "avatars", cfg.MinIO.Bucket)
 		assert.Contains(t, cfg.RabbitMQ.URL, "amqp://guest:guest@localhost:5672/")
+
+		assert.GreaterOrEqual(t, len(cfg.JWT.Secret), 32)
 	})
 
 	t.Run("env_override", func(t *testing.T) {
@@ -109,6 +111,9 @@ func TestConfig_Validate(t *testing.T) {
 				},
 				RabbitMQ: RabbitMQConfig{
 					URL: "amqp://guest:guest@localhost:5672/",
+				},
+				JWT: JWTConfig{
+					Secret: "this-is-a-very-long-jwt-secret-key-for-development-and-testing-purposes-1234567890",
 				},
 			},
 			wantErr: "",
